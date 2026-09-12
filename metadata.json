@@ -1,0 +1,7 @@
+{
+  "name": "Quanto Posso Gastar",
+  "description": "Controle financeiro pessoal inteligente com teto diário baseado no saldo em conta, gestão de faturas, tetos de gastos e simuladores.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
