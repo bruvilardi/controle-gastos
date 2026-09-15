@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil } from 'lucide-react';
+import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard } from 'lucide-react';
 import { AppState, Conta, Gasto, Teto } from './types';
 
 const INITIAL_STATE: AppState = {
@@ -38,6 +38,59 @@ export default function App() {
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newExpenseName, setNewExpenseName] = useState('');
+  const [newExpenseValue, setNewExpenseValue] = useState('');
+  const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().substring(0, 10));
+  const [newExpenseType, setNewExpenseType] = useState<'Fixo' | 'Parcela' | 'Variável'>('Variável');
+
+  const getCategoryFromName = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('farmácia') || n.includes('droga') || n.includes('médico') || n.includes('saúde') || n.includes('remedio') || n.includes('remédio')) return 'Saúde';
+    if (n.includes('mercado') || n.includes('padaria') || n.includes('ifood') || n.includes('restaurante') || n.includes('lanche') || n.includes('pizza') || n.includes('comida') || n.includes('assai') || n.includes('atacadão')) return 'Alimentação';
+    if (n.includes('uber') || n.includes('99') || n.includes('posto') || n.includes('gasolina') || n.includes('transporte') || n.includes('ônibus') || n.includes('metro')) return 'Transporte';
+    if (n.includes('disco') || n.includes('vinil') || n.includes('cd') || n.includes('música')) return 'Discos';
+    if (n.includes('roupa') || n.includes('shopping') || n.includes('cinema') || n.includes('lazer')) return 'Lazer';
+    if (n.includes('delivery')) return 'Delivery';
+    return 'Outros';
+  };
+
+  const handleSaveNewExpense = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newExpenseName || !newExpenseValue) return;
+    const val = Number(newExpenseValue.replace(',', '.'));
+    
+    if (newExpenseType === 'Variável') {
+      setState(prev => ({
+        ...prev,
+        gastos: [{
+          id: Math.random().toString(36).substr(2, 9),
+          descricao: newExpenseName,
+          valor: val,
+          data: newExpenseDate,
+          categoria: getCategoryFromName(newExpenseName)
+        }, ...prev.gastos]
+      }));
+    } else {
+      setState(prev => ({
+        ...prev,
+        contas: [...prev.contas, {
+          id: Math.random().toString(36).substr(2, 9),
+          nome: newExpenseName,
+          valor: val,
+          diaVencimento: Number(newExpenseDate.split('-')[2]),
+          grupo: newExpenseType === 'Fixo' ? 'Gastos Fixos' : 'Parcelamentos'
+        }]
+      }));
+    }
+    
+    setIsAddModalOpen(false);
+    setNewExpenseName('');
+    setNewExpenseValue('');
+    setNewExpenseDate(new Date().toISOString().substring(0, 10));
+    setNewExpenseType('Variável');
+  };
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('fin_auth') === 'true');
   const [authInput, setAuthInput] = useState('');
@@ -322,6 +375,15 @@ export default function App() {
           {isProcessing && (
             <p className="text-sm mt-3 animate-pulse opacity-80">Categorizando seu gasto...</p>
           )}
+
+          <div className="mt-4 pt-4 border-t border-[#B8D0F5]">
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="w-full bg-white text-[#0B57D0] py-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#F8F9FA] transition-colors"
+            >
+              Ou Adicionar Manualmente
+            </button>
+          </div>
         </section>
 
         {/* Meus Tetos (Budgets) */}
@@ -379,7 +441,9 @@ export default function App() {
           </h2>
           <div className="space-y-8">
             {['Gastos Fixos', 'Parcelamentos'].map(grupoNome => {
-              const contasGrupo = state.contas.filter(c => c.grupo === grupoNome);
+              const contasGrupo = state.contas
+                .filter(c => c.grupo === grupoNome)
+                .sort((a, b) => a.diaVencimento - b.diaVencimento);
               if (contasGrupo.length === 0) return null;
               
               const totalGrupo = contasGrupo.reduce((acc, c) => acc + c.valor, 0);
@@ -459,6 +523,104 @@ export default function App() {
         </section>
 
       </main>
+
+      {/* Modal Adicionar Gasto */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-[#041E49]">Adicionar Novo Gasto</h2>
+              <button onClick={() => setIsAddModalOpen(false)} className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveNewExpense} className="space-y-5">
+              <div>
+                <label className="block text-[#041E49] font-bold mb-1.5">O que você comprou ou pagou?</label>
+                <input 
+                  type="text" 
+                  required
+                  value={newExpenseName}
+                  onChange={e => setNewExpenseName(e.target.value)}
+                  placeholder="Ex: Farmácia, Supermercado..."
+                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[#041E49] font-bold mb-1.5">Qual o valor? (R$)</label>
+                <input 
+                  type="text"
+                  inputMode="decimal"
+                  required
+                  value={newExpenseValue}
+                  onChange={e => setNewExpenseValue(e.target.value)}
+                  placeholder="0,00"
+                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[#041E49] font-bold mb-1.5">Qual a Data? (Vencimento ou Compra)</label>
+                <input 
+                  type="date"
+                  required
+                  value={newExpenseDate}
+                  onChange={e => setNewExpenseDate(e.target.value)}
+                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[#041E49] font-bold mb-1.5">Que tipo de gasto é esse?</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => setNewExpenseType('Fixo')}
+                    className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Fixo' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
+                  >
+                    <span className={`font-bold ${newExpenseType === 'Fixo' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Fixo</span>
+                    <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Luz, Água</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setNewExpenseType('Parcela')}
+                    className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Parcela' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
+                  >
+                    <span className={`font-bold ${newExpenseType === 'Parcela' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Parcela</span>
+                    <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: TV em 10x</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setNewExpenseType('Variável')}
+                    className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Variável' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
+                  >
+                    <span className={`font-bold ${newExpenseType === 'Variável' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Variável</span>
+                    <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Padaria</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-[#041E49] font-bold mb-1.5">Categoria (Automática)</label>
+                <div className="w-full bg-[#F4F6F8] border border-[#E3E8ED] rounded-xl px-4 py-3 flex items-center gap-3">
+                  <CreditCard className="w-5 h-5 text-[#5F6368]" />
+                  <span className="font-bold text-[#041E49]">{getCategoryFromName(newExpenseName)}</span>
+                </div>
+                <p className="text-xs text-[#5F6368] mt-2">A categoria muda sozinha pelo nome do gasto!</p>
+              </div>
+              
+              <button 
+                type="submit"
+                className="w-full bg-[#0F9D58] hover:bg-[#0B8043] text-white font-bold py-4 rounded-xl transition-colors mt-2 text-lg shadow-sm"
+              >
+                Salvar Gasto
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -24,7 +24,7 @@ async function startServer() {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
       const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
+        model: 'gemini-2.5-flash',
         contents: `Analise a seguinte despesa financeira e extraia os dados.
         O usuário costuma comprar Discos, pedir Delivery (iFood), ir ao Mercado, ou tem gastos Fixos/Outros.
         Extraia o valor (numérico), uma descrição curta e limpa, e a categoria correspondente.
