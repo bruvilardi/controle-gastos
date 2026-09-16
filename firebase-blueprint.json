@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "UserData": {
+      "title": "UserData",
+      "description": "User financial data",
+      "type": "object",
+      "properties": {
+        "rendaMensal": { "type": "number" },
+        "saldoConta": { "type": "number" },
+        "metaPoupanca": { "type": "number" },
+        "tetos": { "type": "array" },
+        "gastos": { "type": "array" },
+        "contas": { "type": "array" }
+      }
+    }
+  },
+  "firestore": {
+    "/finances/{userId}": {
+      "schema": { "$ref": "#/entities/UserData" },
+      "description": "Stores financial data for each user"
+    }
+  }
+}

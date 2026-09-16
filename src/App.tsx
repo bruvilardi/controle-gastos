@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard } from 'lucide-react';
 import { AppState, Conta, Gasto, Teto } from './types';
+import { db } from './lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const INITIAL_STATE: AppState = {
   rendaMensal: 7914.00,
@@ -98,39 +100,89 @@ export default function App() {
 
   // Load state on mount
   useEffect(() => {
-    const saved = localStorage.getItem('qpg_simple_state_v5');
-    let parsedState = INITIAL_STATE;
-    
-    if (saved) {
+    async function loadData() {
       try {
-        parsedState = JSON.parse(saved);
-        // Fallbacks for older versions
-        if (!parsedState.rendaMensal) parsedState.rendaMensal = INITIAL_STATE.rendaMensal;
-        if (!parsedState.mesAtual) parsedState.mesAtual = INITIAL_STATE.mesAtual;
-      } catch (e) {
-        console.error("Failed to parse state", e);
+        const docRef = doc(db, 'finances', 'bruno');
+        const docSnap = await getDoc(docRef);
+        
+        let parsedState = INITIAL_STATE;
+        if (docSnap.exists()) {
+          parsedState = docSnap.data() as AppState;
+          
+          if (!parsedState.rendaMensal) parsedState.rendaMensal = INITIAL_STATE.rendaMensal;
+          if (!parsedState.mesAtual) parsedState.mesAtual = INITIAL_STATE.mesAtual;
+        } else {
+          // If no data in firebase yet, fallback to localStorage if available
+          const saved = localStorage.getItem('qpg_simple_state_v5');
+          if (saved) {
+            try {
+              parsedState = JSON.parse(saved);
+              if (!parsedState.rendaMensal) parsedState.rendaMensal = INITIAL_STATE.rendaMensal;
+              if (!parsedState.mesAtual) parsedState.mesAtual = INITIAL_STATE.mesAtual;
+            } catch (e) {}
+          }
+        }
+
+        const currentMonth = new Date().toISOString().substring(0, 7);
+        
+        const advanceInstallments = (contas: Conta[]) => {
+          return contas.map(c => {
+            if (c.grupo === 'Parcelamentos') {
+              const match = c.nome.match(/(\d+)\/(\d+)/);
+              if (match) {
+                let current = parseInt(match[1], 10);
+                let total = parseInt(match[2], 10);
+                if (current < total) {
+                  return { ...c, nome: c.nome.replace(`${match[1]}/${match[2]}`, `${current + 1}/${total}`) };
+                }
+              }
+              
+              const matchDe = c.nome.match(/(\d+)\s+de\s+(\d+)/);
+              if (matchDe) {
+                let current = parseInt(matchDe[1], 10);
+                let total = parseInt(matchDe[2], 10);
+                if (current < total) {
+                  return { ...c, nome: c.nome.replace(`${matchDe[1]} de ${matchDe[2]}`, `${current + 1} de ${total}`) };
+                }
+              }
+            }
+            return c;
+          });
+        };
+
+        if (parsedState.mesAtual !== currentMonth) {
+          parsedState = {
+            ...parsedState,
+            mesAtual: currentMonth,
+            saldoConta: parsedState.saldoConta + parsedState.rendaMensal,
+            contas: advanceInstallments(parsedState.contas)
+          };
+        }
+
+        setState(parsedState);
+      } catch (err) {
+        console.error("Failed to load from firebase", err);
+      } finally {
+        setIsLoaded(true);
       }
     }
-
-    const currentMonth = new Date().toISOString().substring(0, 7);
-    
-    // Auto-update / Rollover when month changes
-    if (parsedState.mesAtual !== currentMonth) {
-      parsedState = {
-        ...parsedState,
-        mesAtual: currentMonth,
-        saldoConta: parsedState.saldoConta + parsedState.rendaMensal // Add salary!
-      };
-    }
-
-    setState(parsedState);
-    setIsLoaded(true);
+    loadData();
   }, []);
 
   // Save state on change
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('qpg_simple_state_v5', JSON.stringify(state));
+      
+      // Save to Firebase
+      const saveData = async () => {
+        try {
+          await setDoc(doc(db, 'finances', 'bruno'), state);
+        } catch (err) {
+          console.error("Failed to save to firebase", err);
+        }
+      };
+      saveData();
     }
   }, [state, isLoaded]);
 
@@ -154,6 +206,15 @@ export default function App() {
     acc[g.categoria] = (acc[g.categoria] || 0) + g.valor;
     return acc;
   }, {} as Record<string, number>);
+
+  const handleResetGastos = () => {
+    if (confirm("Tem certeza que deseja limpar todo o histórico de gastos variáveis?")) {
+      setState(prev => ({
+        ...prev,
+        gastos: []
+      }));
+    }
+  };
 
   const handleAddGastoAuto = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -508,7 +569,7 @@ export default function App() {
           {state.gastos.length === 0 ? (
             <p className="text-sm text-[#5F6368] text-center py-4">Nenhum gasto registrado ainda.</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 mb-4">
               {state.gastos.slice(0, 5).map(g => (
                 <div key={g.id} className="flex justify-between items-center py-2 border-b border-[#F1F3F4] last:border-0">
                   <div>
@@ -520,6 +581,17 @@ export default function App() {
               ))}
             </div>
           )}
+
+          <div className="pt-4 mt-4 border-t border-[#F1F3F4]">
+            <button
+              onClick={handleResetGastos}
+              disabled={state.gastos.length === 0}
+              className={`w-full font-medium py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors ${state.gastos.length === 0 ? 'bg-[#F1F3F4] text-[#9AA0A6] cursor-not-allowed' : 'bg-[#F9DEDC] text-[#B3261E] hover:bg-[#F2B8B5]'}`}
+            >
+              <Trash2 className="w-5 h-5" />
+              Zerar Gastos do Mês
+            </button>
+          </div>
         </section>
 
       </main>
