@@ -37,8 +37,6 @@ const INITIAL_STATE: AppState = {
 export default function App() {
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [inputText, setInputText] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -216,47 +214,6 @@ export default function App() {
     }
   };
 
-  const handleAddGastoAuto = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim()) return;
-
-    setIsProcessing(true);
-    try {
-      const res = await fetch('/api/categorize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: inputText }),
-      });
-      
-      const data = await res.json();
-      
-      if (data.valor && data.categoria) {
-        const novoGasto: Gasto = {
-          id: `g-${Date.now()}`,
-          valor: data.valor,
-          categoria: data.categoria,
-          descricao: data.descricao || inputText,
-          data: new Date().toISOString(),
-        };
-
-        setState(prev => ({
-          ...prev,
-          saldoConta: prev.saldoConta - novoGasto.valor, // Subtract from balance
-          gastos: [novoGasto, ...prev.gastos]
-        }));
-        
-        setInputText('');
-      } else {
-        alert("Não consegui entender o valor e a categoria. Tente escrever de forma mais clara, ex: 'Comprei um disco no Mercado Livre por 150'");
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao processar o gasto automaticamente.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const formatBRL = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
@@ -407,44 +364,17 @@ export default function App() {
           </div>
         </section>
 
-        {/* Input Mágico (Gemini) */}
-        <section className="bg-[#D3E3FD] rounded-[28px] p-6 shadow-sm text-[#041E49]">
-          <h2 className="text-lg font-medium mb-1 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#0B57D0]" />
-            Adicionar Gasto Inteligente
-          </h2>
-          <p className="text-sm mb-4 opacity-80">
-            Escreva o que você gastou e eu organizo tudo sozinho.
-          </p>
-          <form onSubmit={handleAddGastoAuto} className="flex gap-2">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ex: Pedi uma pizza por 75 no iFood"
-              className="flex-1 bg-white border-0 rounded-[16px] px-4 py-3 text-[#202124] shadow-sm focus:ring-2 focus:ring-[#0B57D0] outline-none placeholder-[#5F6368]"
-              disabled={isProcessing}
-            />
-            <button
-              type="submit"
-              disabled={isProcessing || !inputText.trim()}
-              className="bg-[#0B57D0] text-white p-3 rounded-[16px] shadow-sm hover:bg-[#0842A0] disabled:opacity-50 transition-colors flex items-center justify-center"
-            >
-              <Plus className="w-6 h-6" />
-            </button>
-          </form>
-          {isProcessing && (
-            <p className="text-sm mt-3 animate-pulse opacity-80">Categorizando seu gasto...</p>
-          )}
-
-          <div className="mt-4 pt-4 border-t border-[#B8D0F5]">
-            <button 
-              onClick={() => setIsAddModalOpen(true)}
-              className="w-full bg-white text-[#0B57D0] py-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#F8F9FA] transition-colors"
-            >
-              Ou Adicionar Manualmente
-            </button>
-          </div>
+        {/* Botão Adicionar Gasto Principal */}
+        <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0] text-center">
+          <h2 className="text-lg font-medium mb-1 text-[#202124]">Adicionar Nova Despesa</h2>
+          <p className="text-sm mb-4 text-[#5F6368]">Registre compras variáveis, parcelamentos ou novas contas fixas.</p>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="w-full bg-[#0B57D0] text-white py-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#0842A0] transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Adicionar Gasto
+          </button>
         </section>
 
         {/* Meus Tetos (Budgets) */}
