@@ -10,7 +10,9 @@
         "metaPoupanca": { "type": "number" },
         "tetos": { "type": "array" },
         "gastos": { "type": "array" },
-        "contas": { "type": "array" }
+        "contas": { "type": "array" },
+        "metasEconomia": { "type": "array" },
+        "categorias": { "type": "array" }
       }
     }
   },
