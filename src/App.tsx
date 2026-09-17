@@ -224,6 +224,24 @@ export default function App() {
     }));
   };
 
+  const handleRemoveConta = (id: string) => {
+    if (confirm("Deseja realmente remover esta conta?")) {
+      setState(prev => ({
+        ...prev,
+        contas: prev.contas.filter(c => c.id !== id)
+      }));
+    }
+  };
+
+  const handleRemoveGasto = (id: string) => {
+    if (confirm("Deseja realmente remover este gasto?")) {
+      setState(prev => ({
+        ...prev,
+        gastos: prev.gastos.filter(g => g.id !== id)
+      }));
+    }
+  };
+
   const handleUpdateTeto = (id: string, limite: number) => {
     setState(prev => ({
       ...prev,
@@ -471,12 +489,17 @@ export default function App() {
                         </div>
                         <div className="text-right flex flex-col items-end">
                           {isEditing ? (
-                            <input 
-                              type="number" 
-                              value={conta.valor || ''} 
-                              onChange={e => handleUpdateConta(conta.id, 'valor', Number(e.target.value))} 
-                              className="border border-[#DADCE0] rounded px-2 py-1 w-24 text-right bg-white font-medium text-[15px]" 
-                            />
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="number" 
+                                value={conta.valor || ''} 
+                                onChange={e => handleUpdateConta(conta.id, 'valor', Number(e.target.value))} 
+                                className="border border-[#DADCE0] rounded px-2 py-1 w-24 text-right bg-white font-medium text-[15px]" 
+                              />
+                              <button onClick={() => handleRemoveConta(conta.id)} className="p-1.5 bg-[#F9DEDC] text-[#B3261E] rounded-md hover:bg-[#F2B8B5] transition-colors">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           ) : (
                             <div className="font-medium text-[15px]">{formatBRL(conta.valor)}</div>
                           )}
@@ -506,7 +529,12 @@ export default function App() {
                     <p className="font-medium">{g.descricao}</p>
                     <p className="text-xs text-[#5F6368]">{g.categoria} • {new Date(g.data).toLocaleDateString('pt-BR')}</p>
                   </div>
-                  <div className="font-medium">{formatBRL(g.valor)}</div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{formatBRL(g.valor)}</span>
+                    <button onClick={() => handleRemoveGasto(g.id)} className="p-1.5 text-[#5F6368] hover:bg-[#F9DEDC] hover:text-[#B3261E] rounded-md transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
