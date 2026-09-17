@@ -139,6 +139,9 @@ export default function App() {
   const [newExpenseValue, setNewExpenseValue] = useState('');
   const [newExpenseDate, setNewExpenseDate] = useState(getTodayLocal());
   const [newExpenseType, setNewExpenseType] = useState<'Fixo' | 'Parcela' | 'Variável'>('Variável');
+  const [parcelasTotal, setParcelasTotal] = useState<number>(10);
+  const [parcelaAtual, setParcelaAtual] = useState<number>(1);
+  const [tipoValorParcela, setTipoValorParcela] = useState<'parcela' | 'total'>('parcela');
   const [newExpenseCategory, setNewExpenseCategory] = useState('Outros');
   const [isCategoryManual, setIsCategoryManual] = useState(false);
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
@@ -336,6 +339,9 @@ export default function App() {
     setNewExpenseValue('');
     setNewExpenseDate(getTodayLocal());
     setNewExpenseType('Variável');
+    setParcelasTotal(10);
+    setParcelaAtual(1);
+    setTipoValorParcela('parcela');
     setNewExpenseCategory('Outros');
     setIsCategoryManual(false);
     setIsInlineAddingCategory(false);
@@ -390,6 +396,27 @@ export default function App() {
           categoria: finalCat
         }, ...prev.gastos]
       }));
+    } else if (newExpenseType === 'Parcela') {
+      const dia = Number(finalDate.split('-')[2]) || new Date().getDate();
+      const totalP = Math.max(1, Math.min(99, Number(parcelasTotal) || 1));
+      const atualP = Math.max(1, Math.min(totalP, Number(parcelaAtual) || 1));
+      const valorFinal = tipoValorParcela === 'total'
+        ? Number((val / totalP).toFixed(2))
+        : val;
+
+      const cleanName = newExpenseName.replace(/\s*\(\d+[\/de\s]+\d+\)/i, '').trim();
+      const nomeFormatado = `${cleanName} (${String(atualP).padStart(2, '0')}/${String(totalP).padStart(2, '0')})`;
+
+      setState(prev => ({
+        ...prev,
+        contas: [...prev.contas, {
+          id: Math.random().toString(36).substr(2, 9),
+          nome: nomeFormatado,
+          valor: valorFinal,
+          diaVencimento: dia,
+          grupo: 'Parcelamentos'
+        }]
+      }));
     } else {
       const dia = Number(finalDate.split('-')[2]) || new Date().getDate();
       setState(prev => ({
@@ -399,7 +426,7 @@ export default function App() {
           nome: newExpenseName.trim(),
           valor: val,
           diaVencimento: dia,
-          grupo: newExpenseType === 'Fixo' ? 'Gastos Fixos' : 'Parcelamentos'
+          grupo: 'Gastos Fixos'
         }]
       }));
     }
@@ -410,6 +437,9 @@ export default function App() {
     setNewExpenseValue('');
     setNewExpenseDate(getTodayLocal());
     setNewExpenseType('Variável');
+    setParcelasTotal(10);
+    setParcelaAtual(1);
+    setTipoValorParcela('parcela');
     setNewExpenseCategory('Outros');
     setIsCategoryManual(false);
     setIsInlineAddingCategory(false);
@@ -558,12 +588,24 @@ export default function App() {
     : 0;
   const faltaEconomizarGlobal = Math.max(0, totalMetaEconomiaAlvo - totalEconomizado);
 
-  // Total de gastos variáveis registrados na fatura/mês
-  const totalGastosFatura = state.gastos.reduce((acc, g) => acc + (Number(g.valor) || 0), 0);
+  // Totais separados por tipo de despesa
+  const totalGastosFixos = state.contas
+    .filter(c => c.grupo === 'Gastos Fixos')
+    .reduce((acc, c) => acc + (Number(c.valor) || 0), 0);
 
-  // Contas fixas e parceladas
-  const totalContas = state.contas.reduce((acc, c) => acc + (Number(c.valor) || 0), 0);
-  const saldoLivre = state.saldoConta - totalContas - totalMetaEconomiaAlvo - totalGastosFatura;
+  const totalParcelamentos = state.contas
+    .filter(c => c.grupo === 'Parcelamentos')
+    .reduce((acc, c) => acc + (Number(c.valor) || 0), 0);
+
+  const totalGastosVariaveis = state.gastos
+    .reduce((acc, g) => acc + (Number(g.valor) || 0), 0);
+
+  // Total do Gasto na Fatura / Mês: Gastos Fixos + Gastos Variáveis + Parcelamentos (parcelas ativas no mês)
+  const totalGastoNaFaturaMes = totalGastosFixos + totalGastosVariaveis + totalParcelamentos;
+
+  // Total de contas agendadas (fixas e parceladas)
+  const totalContas = totalGastosFixos + totalParcelamentos;
+  const saldoLivre = state.saldoConta - totalGastoNaFaturaMes - totalMetaEconomiaAlvo;
 
   const totalDiasMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
   const diasRestantes = Math.max(1, totalDiasMes - diaAtual + 1); // Include today
@@ -580,7 +622,7 @@ export default function App() {
     .map(([categoria, valor]) => ({
       name: categoria,
       value: valor,
-      percentage: totalGastosFatura > 0 ? ((valor / totalGastosFatura) * 100).toFixed(1) : '0',
+      percentage: totalGastosVariaveis > 0 ? ((valor / totalGastosVariaveis) * 100).toFixed(1) : '0',
     }))
     .sort((a, b) => b.value - a.value);
 
@@ -804,11 +846,16 @@ export default function App() {
           
           {!isEditing && (
             <div className="mt-6 p-4 bg-[#F8F9FA] rounded-[20px] border border-[#E8EAED]">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-1">
                 <span className="text-[#5F6368] text-sm">Gasto na Fatura / Mês</span>
-                <span className="font-medium text-[#B3261E]">{formatBRL(totalGastosFatura)}</span>
+                <span className="font-semibold text-lg text-[#B3261E]">{formatBRL(totalGastoNaFaturaMes)}</span>
               </div>
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#5F6368] mb-3">
+                <span className="bg-white px-2 py-0.5 rounded-md border border-[#E8EAED]">Fixos: <strong>{formatBRL(totalGastosFixos)}</strong></span>
+                <span className="bg-white px-2 py-0.5 rounded-md border border-[#E8EAED]">Parcelas: <strong>{formatBRL(totalParcelamentos)}</strong></span>
+                <span className="bg-white px-2 py-0.5 rounded-md border border-[#E8EAED]">Variáveis: <strong>{formatBRL(totalGastosVariaveis)}</strong></span>
+              </div>
+              <div className="flex justify-between items-center mb-4 pt-2 border-t border-[#E8EAED]">
                 <span className="text-[#5F6368] text-sm">Dias Restantes</span>
                 <span className="font-medium text-[#202124]">{diasRestantes} dias</span>
               </div>
@@ -844,7 +891,7 @@ export default function App() {
             ) : (
               <>
                 Saldo base: {formatBRL(state.saldoConta)}.<br/>
-                Já descontados {formatBRL(totalContas)} de contas a pagar, {formatBRL(totalMetaEconomiaAlvo)} de metas de economia e {formatBRL(totalGastosFatura)} em gastos variáveis deste mês.
+                Já descontados {formatBRL(totalGastoNaFaturaMes)} de fatura/mês (Fixos: {formatBRL(totalGastosFixos)}, Parcelas: {formatBRL(totalParcelamentos)}, Variáveis: {formatBRL(totalGastosVariaveis)}) e {formatBRL(totalMetaEconomiaAlvo)} de metas de economia.
               </>
             )}
           </div>
@@ -1180,16 +1227,16 @@ export default function App() {
           </div>
         </section>
 
-        {/* Últimos Gastos */}
+        {/* Gastos Variáveis */}
         <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0]">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium flex items-center gap-2">
               <PiggyBank className="w-5 h-5 text-[#0B57D0]" />
-              Últimos Gastos
+              Gastos Variáveis
             </h2>
-            {totalGastosFatura > 0 && (
+            {totalGastosVariaveis > 0 && (
               <span className="text-xs font-semibold text-[#5F6368] bg-[#F1F3F4] px-2.5 py-1 rounded-full">
-                Total: {formatBRL(totalGastosFatura)}
+                Total: {formatBRL(totalGastosVariaveis)}
               </span>
             )}
           </div>
@@ -1381,35 +1428,11 @@ export default function App() {
                       setNewExpenseCategory(getCategoryFromName(val, state.categorias || DEFAULT_CATEGORIES));
                     }
                   }}
-                  placeholder="Ex: Uber Centro, Mercado, Padaria..."
+                  placeholder="Ex: Uber Centro, Mercado, TV Samsung..."
                   className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors"
                 />
               </div>
-              
-              <div>
-                <label className="block text-[#041E49] font-bold mb-1.5">Qual o valor? (R$)</label>
-                <input 
-                  type="text" 
-                  inputMode="decimal"
-                  required
-                  value={newExpenseValue}
-                  onChange={e => setNewExpenseValue(e.target.value)}
-                  placeholder="0,00"
-                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-[#041E49] font-bold mb-1.5">Qual a Data? (Vencimento ou Compra)</label>
-                <input 
-                  type="date" 
-                  required
-                  value={newExpenseDate}
-                  onChange={e => setNewExpenseDate(e.target.value)}
-                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white"
-                />
-              </div>
-              
+
               {!editingGastoId && (
                 <div>
                   <label className="block text-[#041E49] font-bold mb-1.5">Que tipo de gasto é esse?</label>
@@ -1441,96 +1464,277 @@ export default function App() {
                   </div>
                 </div>
               )}
-              
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[#041E49] font-bold text-sm">Categoria</label>
-                  <button 
-                    type="button" 
-                    onClick={() => setIsInlineAddingCategory(!isInlineAddingCategory)} 
-                    className="text-xs text-[#0B57D0] font-semibold hover:underline flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Nova Categoria
-                  </button>
-                </div>
 
-                {isInlineAddingCategory && (
-                  <div className="mb-3 p-2.5 bg-[#F8F9FA] rounded-xl border border-[#0B57D0]/40 flex items-center gap-2 animate-in fade-in duration-200">
-                    <input
-                      type="text"
-                      placeholder="Nome da nova categoria (ex: Livros)"
-                      value={inlineCategoryInput}
-                      onChange={e => setInlineCategoryInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleQuickCreateCategory();
-                        }
-                      }}
-                      autoFocus
-                      className="flex-1 bg-white border border-[#DADCE0] rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#0B57D0]"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleQuickCreateCategory}
-                      className="bg-[#0B57D0] text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-[#0842A0] transition-colors"
-                    >
-                      Adicionar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsInlineAddingCategory(false);
-                        setInlineCategoryInput('');
-                      }}
-                      className="text-[#5F6368] hover:text-[#202124] p-1"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+              {/* Seção detalhada para Parcelamentos */}
+              {!editingGastoId && newExpenseType === 'Parcela' && (
+                <div className="p-4 bg-[#F8F9FA] rounded-2xl border border-[#DADCE0] space-y-4 animate-in fade-in duration-200">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-bold text-[#041E49] uppercase tracking-wider">
+                        Número de Parcelas
+                      </label>
+                      <span className="text-xs font-bold text-[#0B57D0] bg-[#E8F0FE] px-2.5 py-0.5 rounded-full">
+                        {parcelasTotal} parcelas ({parcelasTotal}x)
+                      </span>
+                    </div>
+
+                    {/* Botões rápidos de parcelamento */}
+                    <div className="flex flex-wrap gap-1.5 mb-2.5">
+                      {[2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map(num => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => {
+                            setParcelasTotal(num);
+                            if (parcelaAtual > num) setParcelaAtual(num);
+                          }}
+                          className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all border ${
+                            parcelasTotal === num
+                              ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs'
+                              : 'bg-white text-[#202124] border-[#DADCE0] hover:bg-[#E8EAED]'
+                          }`}
+                        >
+                          {num}x
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Input manual de parcelas */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#5F6368]">Ou digite o total:</span>
+                      <div className="flex items-center border border-[#DADCE0] bg-white rounded-lg px-2 py-1 w-32 focus-within:border-[#0B57D0]">
+                        <input
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={parcelasTotal}
+                          onChange={e => {
+                            const valNum = Math.max(1, Math.min(99, Number(e.target.value) || 1));
+                            setParcelasTotal(valNum);
+                            if (parcelaAtual > valNum) setParcelaAtual(valNum);
+                          }}
+                          className="w-full text-center font-bold text-sm text-[#041E49] focus:outline-none"
+                        />
+                        <span className="text-xs font-medium text-[#5F6368] ml-1">vezes</span>
+                      </div>
+                    </div>
                   </div>
-                )}
 
-                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1 py-1 mb-2">
-                  {(state.categorias || DEFAULT_CATEGORIES).map(cat => {
-                    const currentCat = isCategoryManual 
-                      ? newExpenseCategory 
-                      : (getCategoryFromName(newExpenseName, state.categorias || DEFAULT_CATEGORIES) || 'Outros');
-                    const isSelected = currentCat === cat;
-                    const catColor = getCategoryColor(cat);
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => {
-                          setNewExpenseCategory(cat);
-                          setIsCategoryManual(true);
+                  {/* Parcela inicial */}
+                  <div className="pt-3 border-t border-[#E8EAED] flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-[#041E49] block">Parcela atual:</span>
+                      <span className="text-[11px] text-[#5F6368]">Começa em 1 para compras novas</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-[#5F6368]">Parcela</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={parcelasTotal}
+                        value={parcelaAtual}
+                        onChange={e => {
+                          const p = Math.max(1, Math.min(parcelasTotal, Number(e.target.value) || 1));
+                          setParcelaAtual(p);
                         }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
-                          isSelected
-                            ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs font-semibold'
-                            : 'bg-[#F1F3F4] text-[#202124] border-transparent hover:bg-[#E8EAED]'
+                        className="w-12 text-center font-bold text-sm bg-white border border-[#DADCE0] rounded-lg px-1.5 py-1 text-[#041E49] focus:outline-none focus:border-[#0B57D0]"
+                      />
+                      <span className="text-xs font-bold text-[#5F6368]">de {parcelasTotal}</span>
+                    </div>
+                  </div>
+
+                  {/* Como informar o valor */}
+                  <div className="pt-3 border-t border-[#E8EAED]">
+                    <span className="text-xs font-bold text-[#041E49] block mb-2">Como você vai informar o valor?</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTipoValorParcela('parcela')}
+                        className={`py-2 px-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center text-center transition-colors ${
+                          tipoValorParcela === 'parcela'
+                            ? 'border-[#0B57D0] bg-[#E8F0FE] text-[#0B57D0] shadow-2xs font-bold'
+                            : 'border-[#DADCE0] bg-white text-[#5F6368] hover:bg-[#F1F3F4]'
                         }`}
                       >
-                        <span 
-                          className="w-2 h-2 rounded-full shrink-0" 
-                          style={{ backgroundColor: isSelected ? '#FFFFFF' : catColor }} 
-                        />
-                        {cat}
+                        <span>Valor de cada parcela</span>
+                        <span className="text-[10px] font-normal opacity-80 mt-0.5">ex: R$ 100/mês</span>
                       </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => setIsInlineAddingCategory(true)}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-[#0B57D0] text-[#0B57D0] hover:bg-[#E8F0FE] transition-colors flex items-center gap-1"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Criar nova
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => setTipoValorParcela('total')}
+                        className={`py-2 px-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center text-center transition-colors ${
+                          tipoValorParcela === 'total'
+                            ? 'border-[#0B57D0] bg-[#E8F0FE] text-[#0B57D0] shadow-2xs font-bold'
+                            : 'border-[#DADCE0] bg-white text-[#5F6368] hover:bg-[#F1F3F4]'
+                        }`}
+                      >
+                        <span>Valor total da compra</span>
+                        <span className="text-[10px] font-normal opacity-80 mt-0.5">dividir automático</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs text-[#5F6368]">Detectada automaticamente pelo nome ou toque para escolher.</p>
+              )}
+              
+              <div>
+                <label className="block text-[#041E49] font-bold mb-1.5">
+                  {newExpenseType === 'Parcela'
+                    ? (tipoValorParcela === 'total' ? 'Qual o valor TOTAL da compra? (R$)' : 'Qual o valor de CADA parcela? (R$)')
+                    : 'Qual o valor? (R$)'}
+                </label>
+                <input 
+                  type="text" 
+                  inputMode="decimal"
+                  required
+                  value={newExpenseValue}
+                  onChange={e => setNewExpenseValue(e.target.value)}
+                  placeholder="0,00"
+                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors"
+                />
+
+                {/* Resumo dinâmico em tempo real para Parcelamentos */}
+                {!editingGastoId && newExpenseType === 'Parcela' && newExpenseValue && (
+                  <div className="mt-2.5 p-3 bg-[#E8F0FE] rounded-xl border border-[#D2E3FC] text-xs text-[#041E49] space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[#0B57D0]">Resumo do Parcelamento</span>
+                      <span className="font-bold bg-[#0B57D0] text-white px-2 py-0.5 rounded-full text-[10px]">
+                        {String(parcelaAtual).padStart(2, '0')}/{String(parcelasTotal).padStart(2, '0')}
+                      </span>
+                    </div>
+                    {(() => {
+                      const valNum = parseCurrency(newExpenseValue) || 0;
+                      const valParcela = tipoValorParcela === 'total'
+                        ? (valNum / Math.max(1, parcelasTotal))
+                        : valNum;
+                      const valTotal = tipoValorParcela === 'total'
+                        ? valNum
+                        : (valNum * parcelasTotal);
+
+                      return (
+                        <div className="space-y-0.5 text-[#202124]">
+                          <p>
+                            Fatura deste mês: <strong className="text-[#0B57D0] text-sm">{formatBRL(valParcela)}</strong>
+                          </p>
+                          <p className="text-[#5F6368]">
+                            {parcelasTotal} parcelas • Total da compra: {formatBRL(valTotal)}
+                          </p>
+                          <p className="text-[11px] text-[#5F6368] pt-1 border-t border-[#D2E3FC]">
+                            Nome na fatura: <strong>{newExpenseName.trim() || 'Compra'} ({String(parcelaAtual).padStart(2, '0')}/{String(parcelasTotal).padStart(2, '0')})</strong>
+                          </p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
+              
+              <div>
+                <label className="block text-[#041E49] font-bold mb-1.5">
+                  {newExpenseType === 'Parcela' || newExpenseType === 'Fixo' 
+                    ? 'Data da Compra ou Vencimento da Fatura' 
+                    : 'Qual a Data? (Vencimento ou Compra)'}
+                </label>
+                <input 
+                  type="date" 
+                  required
+                  value={newExpenseDate}
+                  onChange={e => setNewExpenseDate(e.target.value)}
+                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white"
+                />
+              </div>
+
+              {/* Categorias - exibidas para gastos variáveis ou edição de gasto */}
+              {(editingGastoId || newExpenseType === 'Variável') && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[#041E49] font-bold text-sm">Categoria</label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsInlineAddingCategory(!isInlineAddingCategory)} 
+                      className="text-xs text-[#0B57D0] font-semibold hover:underline flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Nova Categoria
+                    </button>
+                  </div>
+
+                  {isInlineAddingCategory && (
+                    <div className="mb-3 p-2.5 bg-[#F8F9FA] rounded-xl border border-[#0B57D0]/40 flex items-center gap-2 animate-in fade-in duration-200">
+                      <input
+                        type="text"
+                        placeholder="Nome da nova categoria (ex: Livros)"
+                        value={inlineCategoryInput}
+                        onChange={e => setInlineCategoryInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleQuickCreateCategory();
+                          }
+                        }}
+                        autoFocus
+                        className="flex-1 bg-white border border-[#DADCE0] rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#0B57D0]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleQuickCreateCategory}
+                        className="bg-[#0B57D0] text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-[#0842A0] transition-colors"
+                      >
+                        Adicionar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsInlineAddingCategory(false);
+                          setInlineCategoryInput('');
+                        }}
+                        className="text-[#5F6368] hover:text-[#202124] p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1 py-1 mb-2">
+                    {(state.categorias || DEFAULT_CATEGORIES).map(cat => {
+                      const currentCat = isCategoryManual 
+                        ? newExpenseCategory 
+                        : (getCategoryFromName(newExpenseName, state.categorias || DEFAULT_CATEGORIES) || 'Outros');
+                      const isSelected = currentCat === cat;
+                      const catColor = getCategoryColor(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setNewExpenseCategory(cat);
+                            setIsCategoryManual(true);
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs font-semibold'
+                              : 'bg-[#F1F3F4] text-[#202124] border-transparent hover:bg-[#E8EAED]'
+                          }`}
+                        >
+                          <span 
+                            className="w-2 h-2 rounded-full shrink-0" 
+                            style={{ backgroundColor: isSelected ? '#FFFFFF' : catColor }} 
+                          />
+                          {cat}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setIsInlineAddingCategory(true)}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-[#0B57D0] text-[#0B57D0] hover:bg-[#E8F0FE] transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Criar nova
+                    </button>
+                  </div>
+                  <p className="text-xs text-[#5F6368]">Detectada automaticamente pelo nome ou toque para escolher.</p>
+                </div>
+              )}
               
               <button 
                 type="submit"
