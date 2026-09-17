@@ -1,22 +1,63 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, PieChart as PieChartIcon, TrendingUp, Coins } from 'lucide-react';
+import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, PieChart as PieChartIcon, TrendingUp, Coins, Tag, FolderPlus, Settings2, Download } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { AppState, Conta, Gasto, Teto, MetaEconomia } from './types';
 import { db } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Uber': '#1F2937',       // Dark Charcoal
-  'Delivery': '#EA4335',   // Coral Red
-  'Mercado': '#FBBC04',    // Gold Yellow
-  'Discos': '#4285F4',     // Google Blue
-  'Saúde': '#34A853',      // Emerald Green
-  'Transporte': '#0EA5E9', // Sky Blue
-  'Lazer': '#A855F7',      // Purple
-  'Outros': '#9AA0A6',     // Gray
+export const DEFAULT_CATEGORIES = [
+  'Uber',
+  'Delivery',
+  'Mercado',
+  'Discos',
+  'Alimentação',
+  'Transporte',
+  'Saúde',
+  'Lazer',
+  'Moradia',
+  'Educação',
+  'Vestuário',
+  'Assinaturas',
+  'Cuidados Pessoais',
+  'Pet',
+  'Viagem',
+  'Outros'
+];
+
+export const CATEGORY_COLORS: Record<string, string> = {
+  'Uber': '#1F2937',             // Dark Charcoal
+  'Delivery': '#EA4335',         // Coral Red
+  'Mercado': '#FBBC04',          // Gold Yellow
+  'Discos': '#4285F4',           // Google Blue
+  'Alimentação': '#FA7B17',      // Orange
+  'Transporte': '#0EA5E9',       // Sky Blue
+  'Saúde': '#34A853',            // Emerald Green
+  'Lazer': '#A855F7',            // Purple
+  'Moradia': '#8B5CF6',          // Indigo Violet
+  'Educação': '#059669',         // Deep Teal
+  'Vestuário': '#EC4899',        // Rose Pink
+  'Assinaturas': '#6366F1',      // Indigo
+  'Cuidados Pessoais': '#F43F5E', // Rose Red
+  'Pet': '#D97706',              // Amber / Brown
+  'Viagem': '#14B8A6',           // Teal
+  'Outros': '#9AA0A6',           // Gray
 };
 
-const PALETTE_FALLBACK = ['#0B57D0', '#12B5CB', '#7C3AED', '#E65100', '#D93025', '#188038'];
+export const PALETTE_FALLBACK = [
+  '#0B57D0', '#12B5CB', '#7C3AED', '#E65100', '#D93025', 
+  '#188038', '#D81B60', '#8E24AA', '#3949AB', '#00897B', 
+  '#F4511E', '#6D4C41', '#546E7A', '#C0CA33', '#00ACC1'
+];
+
+export const getCategoryColor = (cat: string, index = 0): string => {
+  if (CATEGORY_COLORS[cat]) return CATEGORY_COLORS[cat];
+  let hash = 0;
+  for (let i = 0; i < cat.length; i++) {
+    hash = cat.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colorIndex = Math.abs(hash) % PALETTE_FALLBACK.length;
+  return PALETTE_FALLBACK[colorIndex] || PALETTE_FALLBACK[index % PALETTE_FALLBACK.length];
+};
 
 const INITIAL_STATE: AppState = {
   rendaMensal: 7914.00,
@@ -45,6 +86,7 @@ const INITIAL_STATE: AppState = {
     { id: 't3', categoria: 'Mercado', limite: 1200 },
     { id: 't4', categoria: 'Uber', limite: 300 },
   ],
+  categorias: DEFAULT_CATEGORIES,
   gastos: [],
   metasEconomia: [
     { id: 'm1', titulo: 'Poupança Mensal', valorAlvo: 500, valorAtual: 350 },
@@ -99,6 +141,15 @@ export default function App() {
   const [newExpenseType, setNewExpenseType] = useState<'Fixo' | 'Parcela' | 'Variável'>('Variável');
   const [newExpenseCategory, setNewExpenseCategory] = useState('Outros');
   const [isCategoryManual, setIsCategoryManual] = useState(false);
+  const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
+  const [showAllGastos, setShowAllGastos] = useState(false);
+
+  // Categorias management states
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatTeto, setNewCatTeto] = useState('');
+  const [isInlineAddingCategory, setIsInlineAddingCategory] = useState(false);
+  const [inlineCategoryInput, setInlineCategoryInput] = useState('');
 
   // Metas de Economia state & handlers
   const [isMetaModalOpen, setIsMetaModalOpen] = useState(false);
@@ -176,25 +227,132 @@ export default function App() {
     }));
   };
 
-  const getCategoryFromName = (name: string) => {
+  // Category Management Handlers
+  const handleAddCategory = (nome: string, tetoOpcional?: number) => {
+    const trimmed = nome.trim();
+    if (!trimmed) return;
+    const formatted = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+
+    setState(prev => {
+      const currentCats = prev.categorias || DEFAULT_CATEGORIES;
+      const alreadyExists = currentCats.some(c => c.toLowerCase() === formatted.toLowerCase());
+      const updatedCats = alreadyExists ? currentCats : [...currentCats, formatted];
+
+      let updatedTetos = prev.tetos || [];
+      if (tetoOpcional && tetoOpcional > 0) {
+        const existingIdx = updatedTetos.findIndex(t => t.categoria.toLowerCase() === formatted.toLowerCase());
+        if (existingIdx >= 0) {
+          updatedTetos = updatedTetos.map((t, i) => i === existingIdx ? { ...t, limite: tetoOpcional } : t);
+        } else {
+          updatedTetos = [...updatedTetos, { id: 't_' + Math.random().toString(36).substr(2, 7), categoria: formatted, limite: tetoOpcional }];
+        }
+      }
+
+      return {
+        ...prev,
+        categorias: updatedCats,
+        tetos: updatedTetos
+      };
+    });
+  };
+
+  const handleQuickCreateCategory = () => {
+    if (!inlineCategoryInput.trim()) return;
+    const formatted = inlineCategoryInput.trim().charAt(0).toUpperCase() + inlineCategoryInput.trim().slice(1);
+    handleAddCategory(formatted);
+    setNewExpenseCategory(formatted);
+    setIsCategoryManual(true);
+    setInlineCategoryInput('');
+    setIsInlineAddingCategory(false);
+  };
+
+  const handleDeleteCategory = (catName: string) => {
+    const expensesCount = state.gastos.filter(g => g.categoria.toLowerCase() === catName.toLowerCase()).length;
+    if (expensesCount > 0) {
+      setConfirmDialog({
+        message: `Não é possível excluir a categoria "${catName}" porque ela possui ${expensesCount} gasto(s) vinculado(s). Reclassifique esses gastos antes de remover a categoria.`,
+        onConfirm: () => {}
+      });
+      return;
+    }
+
+    setConfirmDialog({
+      message: `Deseja remover a categoria "${catName}"?`,
+      onConfirm: () => {
+        setState(prev => ({
+          ...prev,
+          categorias: (prev.categorias || DEFAULT_CATEGORIES).filter(c => c.toLowerCase() !== catName.toLowerCase()),
+          tetos: (prev.tetos || []).filter(t => t.categoria.toLowerCase() !== catName.toLowerCase())
+        }));
+      }
+    });
+  };
+
+  const handleRemoveTeto = (tetoId: string) => {
+    setConfirmDialog({
+      message: "Deseja remover este teto de gastos?",
+      onConfirm: () => {
+        setState(prev => ({
+          ...prev,
+          tetos: prev.tetos.filter(t => t.id !== tetoId)
+        }));
+      }
+    });
+  };
+
+  const getCategoryFromName = (name: string, availableCategories?: string[]) => {
     const n = name.toLowerCase();
+
+    // Check custom or dynamic categories first
+    if (availableCategories) {
+      for (const cat of availableCategories) {
+        if (cat.toLowerCase() !== 'outros' && n.includes(cat.toLowerCase())) {
+          return cat;
+        }
+      }
+    }
+
     if (n.includes('uber') || n.includes('99') || n.includes('corrida') || n.includes('taxi') || n.includes('táxi')) return 'Uber';
     if (n.includes('disco') || n.includes('vinil') || n.includes('cd') || n.includes('música') || n.includes('musica')) return 'Discos';
-    if (n.includes('delivery') || n.includes('ifood') || n.includes('rappi') || n.includes('pizza') || n.includes('hambúrguer') || n.includes('lanche')) return 'Delivery';
-    if (n.includes('mercado') || n.includes('padaria') || n.includes('supermercado') || n.includes('assai') || n.includes('atacadão') || n.includes('feira') || n.includes('compras')) return 'Mercado';
-    if (n.includes('farmácia') || n.includes('farmacia') || n.includes('droga') || n.includes('médico') || n.includes('medico') || n.includes('saúde') || n.includes('saude') || n.includes('remedio') || n.includes('remédio')) return 'Saúde';
-    if (n.includes('posto') || n.includes('gasolina') || n.includes('combustível') || n.includes('combustivel') || n.includes('ônibus') || n.includes('metro') || n.includes('transporte')) return 'Transporte';
-    if (n.includes('roupa') || n.includes('shopping') || n.includes('cinema') || n.includes('lazer')) return 'Lazer';
+    if (n.includes('delivery') || n.includes('ifood') || n.includes('rappi') || n.includes('lanche')) return 'Delivery';
+    if (n.includes('mercado') || n.includes('supermercado') || n.includes('assai') || n.includes('atacadão') || n.includes('feira') || n.includes('compras') || n.includes('sacolão') || n.includes('hortifruti')) return 'Mercado';
+    if (n.includes('restaurante') || n.includes('almoço') || n.includes('almoco') || n.includes('jantar') || n.includes('café') || n.includes('cafe') || n.includes('padaria') || n.includes('pizza') || n.includes('hambúrguer') || n.includes('bar ') || n.includes('churrasco') || n.includes('comida') || n.includes('marmita') || n.includes('esfiha') || n.includes('sushi') || n.includes('alimentação') || n.includes('alimentacao')) return 'Alimentação';
+    if (n.includes('farmácia') || n.includes('farmacia') || n.includes('droga') || n.includes('médico') || n.includes('medico') || n.includes('saúde') || n.includes('saude') || n.includes('remedio') || n.includes('remédio') || n.includes('exame') || n.includes('dentista') || n.includes('hospital') || n.includes('consulta') || n.includes('óptica') || n.includes('optica')) return 'Saúde';
+    if (n.includes('posto') || n.includes('gasolina') || n.includes('combustível') || n.includes('combustivel') || n.includes('etanol') || n.includes('ônibus') || n.includes('onibus') || n.includes('metro') || n.includes('metrô') || n.includes('passagem') || n.includes('pedágio') || n.includes('estacionamento') || n.includes('transporte') || n.includes('bilhete')) return 'Transporte';
+    if (n.includes('aluguel') || n.includes('condomínio') || n.includes('condominio') || n.includes('iptu') || n.includes('luz') || n.includes('água') || n.includes('agua') || n.includes('gás') || n.includes('gas') || n.includes('moradia') || n.includes('reforma') || n.includes('móveis') || n.includes('moveis') || n.includes('casa') || n.includes('leroy')) return 'Moradia';
+    if (n.includes('curso') || n.includes('faculdade') || n.includes('escola') || n.includes('livro') || n.includes('udemy') || n.includes('educação') || n.includes('educacao') || n.includes('mensalidade') || n.includes('estudo')) return 'Educação';
+    if (n.includes('roupa') || n.includes('calçado') || n.includes('calcado') || n.includes('tenis') || n.includes('tênis') || n.includes('sapato') || n.includes('vestuário') || n.includes('vestuario') || n.includes('camisa') || n.includes('calça') || n.includes('zara') || n.includes('renner') || n.includes('c&a')) return 'Vestuário';
+    if (n.includes('netflix') || n.includes('spotify') || n.includes('amazon') || n.includes('prime') || n.includes('disney') || n.includes('hbo') || n.includes('youtube') || n.includes('assinatura') || n.includes('software') || n.includes('streaming') || n.includes('apple') || n.includes('icloud') || n.includes('openai') || n.includes('chatgpt')) return 'Assinaturas';
+    if (n.includes('barbearia') || n.includes('cabelo') || n.includes('salão') || n.includes('salao') || n.includes('manicure') || n.includes('cosmético') || n.includes('perfume') || n.includes('beleza') || n.includes('cuidados') || n.includes('depilação') || n.includes('estética') || n.includes('estetica') || n.includes('skincare')) return 'Cuidados Pessoais';
+    if (n.includes('pet') || n.includes('veterinário') || n.includes('veterinario') || n.includes('ração') || n.includes('racao') || n.includes('cachorro') || n.includes('gato') || n.includes('petshop') || n.includes('cobasi') || n.includes('petz')) return 'Pet';
+    if (n.includes('viagem') || n.includes('hotel') || n.includes('pousada') || n.includes('airbnb') || n.includes('passagens') || n.includes('voo') || n.includes('mala') || n.includes('turismo') || n.includes('booking')) return 'Viagem';
+    if (n.includes('cinema') || n.includes('show') || n.includes('teatro') || n.includes('festa') || n.includes('lazer') || n.includes('jogo') || n.includes('game') || n.includes('shopping') || n.includes('ingresso') || n.includes('parque') || n.includes('balada')) return 'Lazer';
     return 'Outros';
   };
 
   const handleOpenAddModal = () => {
+    setEditingGastoId(null);
     setNewExpenseName('');
     setNewExpenseValue('');
     setNewExpenseDate(getTodayLocal());
     setNewExpenseType('Variável');
     setNewExpenseCategory('Outros');
     setIsCategoryManual(false);
+    setIsInlineAddingCategory(false);
+    setInlineCategoryInput('');
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenEditGasto = (gasto: Gasto) => {
+    setEditingGastoId(gasto.id);
+    setNewExpenseName(gasto.descricao);
+    setNewExpenseValue(gasto.valor ? gasto.valor.toFixed(2).replace('.', ',') : '');
+    setNewExpenseDate(gasto.data || getTodayLocal());
+    setNewExpenseType('Variável');
+    setNewExpenseCategory(gasto.categoria || 'Outros');
+    setIsCategoryManual(true);
+    setIsInlineAddingCategory(false);
+    setInlineCategoryInput('');
     setIsAddModalOpen(true);
   };
 
@@ -205,17 +363,28 @@ export default function App() {
     if (isNaN(val) || val <= 0) return;
     
     const finalDate = newExpenseDate || getTodayLocal();
+    const activeCats = state.categorias || DEFAULT_CATEGORIES;
+    const finalCat = isCategoryManual && newExpenseCategory 
+      ? newExpenseCategory 
+      : (getCategoryFromName(newExpenseName, activeCats) || 'Outros');
 
-    if (newExpenseType === 'Variável') {
-      const finalCat = isCategoryManual && newExpenseCategory 
-        ? newExpenseCategory 
-        : (getCategoryFromName(newExpenseName) || 'Outros');
-
+    if (editingGastoId) {
+      setState(prev => ({
+        ...prev,
+        gastos: prev.gastos.map(g => g.id === editingGastoId ? {
+          ...g,
+          descricao: newExpenseName.trim(),
+          valor: val,
+          data: finalDate,
+          categoria: finalCat
+        } : g)
+      }));
+    } else if (newExpenseType === 'Variável') {
       setState(prev => ({
         ...prev,
         gastos: [{
           id: Math.random().toString(36).substr(2, 9),
-          descricao: newExpenseName,
+          descricao: newExpenseName.trim(),
           valor: val,
           data: finalDate,
           categoria: finalCat
@@ -227,7 +396,7 @@ export default function App() {
         ...prev,
         contas: [...prev.contas, {
           id: Math.random().toString(36).substr(2, 9),
-          nome: newExpenseName,
+          nome: newExpenseName.trim(),
           valor: val,
           diaVencimento: dia,
           grupo: newExpenseType === 'Fixo' ? 'Gastos Fixos' : 'Parcelamentos'
@@ -236,12 +405,15 @@ export default function App() {
     }
     
     setIsAddModalOpen(false);
+    setEditingGastoId(null);
     setNewExpenseName('');
     setNewExpenseValue('');
     setNewExpenseDate(getTodayLocal());
     setNewExpenseType('Variável');
     setNewExpenseCategory('Outros');
     setIsCategoryManual(false);
+    setIsInlineAddingCategory(false);
+    setInlineCategoryInput('');
   };
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('fin_auth') === 'true');
@@ -302,6 +474,15 @@ export default function App() {
             { id: 'm2', titulo: 'Reserva de Emergência', valorAlvo: 300, valorAtual: 150 },
           ];
         }
+
+        // Ensure categorias has default and custom categories merged
+        const loadedCats = parsedState.categorias || [];
+        const usedCats = [
+          ...(parsedState.gastos || []).map(g => g.categoria),
+          ...(parsedState.tetos || []).map(t => t.categoria)
+        ];
+        const allUniqueCats = Array.from(new Set([...DEFAULT_CATEGORIES, ...loadedCats, ...usedCats])).filter(Boolean);
+        parsedState.categorias = allUniqueCats;
         
         const advanceInstallments = (contas: Conta[]) => {
           return contas.map(c => {
@@ -682,12 +863,22 @@ export default function App() {
           </button>
         </section>
 
-        {/* Meus Tetos (Budgets) */}
+        {/* Meus Tetos (Budgets) & Categorias */}
         <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0]">
-          <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <Target className="w-5 h-5 text-[#0B57D0]" />
-            Meus Limites (Tetos)
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium flex items-center gap-2 text-[#202124]">
+              <Target className="w-5 h-5 text-[#0B57D0]" />
+              Meus Limites (Tetos)
+            </h2>
+            <button
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="bg-[#E8F0FE] text-[#0B57D0] hover:bg-[#D2E3FC] px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <Tag className="w-3.5 h-3.5" />
+              <span>Categorias & Limites</span>
+            </button>
+          </div>
+
           <div className="space-y-5">
             {state.tetos.map(t => {
               const gasto = gastosPorCategoria[t.categoria] || 0;
@@ -695,22 +886,36 @@ export default function App() {
               const exceeds = gasto > t.limite;
               const almost = pct >= 80 && !exceeds;
               const barColor = exceeds ? 'bg-[#B3261E]' : almost ? 'bg-[#EA8600]' : 'bg-[#146C2E]';
+              const catColor = getCategoryColor(t.categoria);
 
               return (
                 <div key={t.id}>
                   <div className="flex justify-between items-end mb-1">
-                    <span className="font-medium">{t.categoria}</span>
+                    <span className="font-medium flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
+                      {t.categoria}
+                    </span>
                     <span className="text-sm flex items-center">
                       <span className={exceeds ? "text-[#B3261E] font-bold" : ""}>{formatBRL(gasto)}</span>
                       <span className="text-[#5F6368] flex items-center gap-1">
                         &nbsp;/&nbsp;
                         {isEditing ? (
-                          <input 
-                            type="number" 
-                            value={t.limite || ''} 
-                            onChange={e => handleUpdateTeto(t.id, Number(e.target.value))} 
-                            className="border border-[#DADCE0] rounded px-2 py-0.5 w-24 text-right bg-white" 
-                          />
+                          <div className="flex items-center gap-1">
+                            <input 
+                              type="number" 
+                              value={t.limite || ''} 
+                              onChange={e => handleUpdateTeto(t.id, Number(e.target.value))} 
+                              className="border border-[#DADCE0] rounded px-2 py-0.5 w-24 text-right bg-white" 
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTeto(t.id)}
+                              className="p-1 text-[#5F6368] hover:text-[#B3261E] hover:bg-[#F9DEDC] rounded transition-colors"
+                              title="Remover teto"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         ) : (
                           formatBRL(t.limite)
                         )}
@@ -726,6 +931,20 @@ export default function App() {
                 </div>
               );
             })}
+
+            {state.tetos.length === 0 && (
+              <div className="text-center py-4">
+                <p className="text-sm text-[#5F6368] mb-3">Você ainda não definiu limites para nenhuma categoria.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#E8F0FE] text-[#0B57D0] rounded-full text-xs font-semibold hover:bg-[#D2E3FC] transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Definir Teto para Categoria
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -1001,7 +1220,7 @@ export default function App() {
                       {pieChartData.map((entry, index) => (
                         <Cell 
                           key={`cell-${index}`} 
-                          fill={CATEGORY_COLORS[entry.name] || PALETTE_FALLBACK[index % PALETTE_FALLBACK.length]} 
+                          fill={getCategoryColor(entry.name, index)} 
                         />
                       ))}
                     </Pie>
@@ -1025,7 +1244,7 @@ export default function App() {
               {/* Legenda com percentuais */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                 {pieChartData.map((item, index) => {
-                  const color = CATEGORY_COLORS[item.name] || PALETTE_FALLBACK[index % PALETTE_FALLBACK.length];
+                  const color = getCategoryColor(item.name, index);
                   return (
                     <div key={item.name} className="flex items-center gap-2 p-2 rounded-xl bg-white border border-[#E8EAED] text-xs">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
@@ -1042,23 +1261,56 @@ export default function App() {
             <p className="text-sm text-[#5F6368] text-center py-4">Nenhum gasto registrado ainda.</p>
           ) : (
             <div className="space-y-3 mb-4">
-              <h3 className="text-xs font-bold text-[#5F6368] uppercase tracking-wider mb-2">
-                Histórico Recente
-              </h3>
-              {state.gastos.slice(0, 5).map(g => (
-                <div key={g.id} className="flex justify-between items-center py-2 border-b border-[#F1F3F4] last:border-0">
-                  <div>
-                    <p className="font-medium">{g.descricao}</p>
-                    <p className="text-xs text-[#5F6368]">{g.categoria} • {formatDateBR(g.data)}</p>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-[#5F6368] uppercase tracking-wider">
+                  Histórico de Gastos ({state.gastos.length})
+                </h3>
+                {state.gastos.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllGastos(!showAllGastos)}
+                    className="text-xs font-semibold text-[#0B57D0] hover:underline"
+                  >
+                    {showAllGastos ? 'Mostrar menos' : `Ver todos (${state.gastos.length})`}
+                  </button>
+                )}
+              </div>
+              <div className={`space-y-2 ${showAllGastos && state.gastos.length > 6 ? 'max-h-96 overflow-y-auto pr-1' : ''}`}>
+                {(showAllGastos ? state.gastos : state.gastos.slice(0, 5)).map(g => (
+                  <div key={g.id} className="flex justify-between items-center py-2.5 px-3 rounded-xl border border-[#F1F3F4] hover:bg-[#F8F9FA] transition-colors">
+                    <div className="min-w-0 flex-1 mr-3">
+                      <p className="font-medium text-sm text-[#202124] truncate">{g.descricao}</p>
+                      <p className="text-xs text-[#5F6368] flex items-center gap-1.5 mt-0.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(g.categoria) }} />
+                        <span>{g.categoria}</span>
+                        <span>•</span>
+                        <span>{formatDateBR(g.data)}</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-semibold text-sm text-[#202124] mr-1">{formatBRL(g.valor)}</span>
+                      <button 
+                        type="button"
+                        onClick={() => handleOpenEditGasto(g)} 
+                        className="p-1.5 text-[#5F6368] hover:bg-[#E8F0FE] hover:text-[#0B57D0] rounded-lg transition-colors"
+                        title="Editar este gasto"
+                        aria-label="Editar este gasto"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveGasto(g.id)} 
+                        className="p-1.5 text-[#5F6368] hover:bg-[#F9DEDC] hover:text-[#B3261E] rounded-lg transition-colors"
+                        title="Excluir este gasto"
+                        aria-label="Excluir este gasto"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium">{formatBRL(g.valor)}</span>
-                    <button onClick={() => handleRemoveGasto(g.id)} className="p-1.5 text-[#5F6368] hover:bg-[#F9DEDC] hover:text-[#B3261E] rounded-md transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
@@ -1076,13 +1328,41 @@ export default function App() {
 
       </main>
 
+      <footer className="max-w-md mx-auto px-4 pb-12 text-center">
+        <a
+          href="/quanto-posso-gastar.zip"
+          download="quanto-posso-gastar.zip"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#DADCE0] text-[#0B57D0] text-xs font-semibold hover:bg-[#F8F9FA] hover:border-[#0B57D0] transition-colors shadow-2xs"
+          title="Baixar todo o código-fonte em formato ZIP"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Baixar Código Completo (.ZIP)
+        </a>
+      </footer>
+
       {/* Modal Adicionar Gasto */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-[#041E49]">Adicionar Novo Gasto</h2>
-              <button onClick={() => setIsAddModalOpen(false)} className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors">
+              <h2 className="text-2xl font-bold text-[#041E49] flex items-center gap-2">
+                {editingGastoId ? (
+                  <>
+                    <Pencil className="w-6 h-6 text-[#0B57D0]" />
+                    Editar Gasto
+                  </>
+                ) : (
+                  'Adicionar Novo Gasto'
+                )}
+              </h2>
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setEditingGastoId(null);
+                }} 
+                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1097,8 +1377,8 @@ export default function App() {
                   onChange={e => {
                     const val = e.target.value;
                     setNewExpenseName(val);
-                    if (!isCategoryManual) {
-                      setNewExpenseCategory(getCategoryFromName(val));
+                    if (!isCategoryManual && !editingGastoId) {
+                      setNewExpenseCategory(getCategoryFromName(val, state.categorias || DEFAULT_CATEGORIES));
                     }
                   }}
                   placeholder="Ex: Uber Centro, Mercado, Padaria..."
@@ -1109,7 +1389,7 @@ export default function App() {
               <div>
                 <label className="block text-[#041E49] font-bold mb-1.5">Qual o valor? (R$)</label>
                 <input 
-                  type="text"
+                  type="text" 
                   inputMode="decimal"
                   required
                   value={newExpenseValue}
@@ -1122,7 +1402,7 @@ export default function App() {
               <div>
                 <label className="block text-[#041E49] font-bold mb-1.5">Qual a Data? (Vencimento ou Compra)</label>
                 <input 
-                  type="date"
+                  type="date" 
                   required
                   value={newExpenseDate}
                   onChange={e => setNewExpenseDate(e.target.value)}
@@ -1130,42 +1410,94 @@ export default function App() {
                 />
               </div>
               
-              <div>
-                <label className="block text-[#041E49] font-bold mb-1.5">Que tipo de gasto é esse?</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button 
-                    type="button"
-                    onClick={() => setNewExpenseType('Fixo')}
-                    className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Fixo' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
-                  >
-                    <span className={`font-bold ${newExpenseType === 'Fixo' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Fixo</span>
-                    <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Luz, Água</span>
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setNewExpenseType('Parcela')}
-                    className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Parcela' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
-                  >
-                    <span className={`font-bold ${newExpenseType === 'Parcela' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Parcela</span>
-                    <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: TV em 10x</span>
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setNewExpenseType('Variável')}
-                    className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Variável' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
-                  >
-                    <span className={`font-bold ${newExpenseType === 'Variável' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Variável</span>
-                    <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Padaria</span>
-                  </button>
+              {!editingGastoId && (
+                <div>
+                  <label className="block text-[#041E49] font-bold mb-1.5">Que tipo de gasto é esse?</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => setNewExpenseType('Fixo')}
+                      className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Fixo' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
+                    >
+                      <span className={`font-bold ${newExpenseType === 'Fixo' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Fixo</span>
+                      <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Luz, Água</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewExpenseType('Parcela')}
+                      className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Parcela' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
+                    >
+                      <span className={`font-bold ${newExpenseType === 'Parcela' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Parcela</span>
+                      <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: TV em 10x</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewExpenseType('Variável')}
+                      className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Variável' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
+                    >
+                      <span className={`font-bold ${newExpenseType === 'Variável' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Variável</span>
+                      <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Padaria</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
               
               <div>
-                <label className="block text-[#041E49] font-bold mb-1.5">Categoria</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {['Uber', 'Delivery', 'Mercado', 'Discos', 'Saúde', 'Transporte', 'Lazer', 'Outros'].map(cat => {
-                    const currentCat = isCategoryManual ? newExpenseCategory : (getCategoryFromName(newExpenseName) || 'Outros');
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[#041E49] font-bold text-sm">Categoria</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsInlineAddingCategory(!isInlineAddingCategory)} 
+                    className="text-xs text-[#0B57D0] font-semibold hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Nova Categoria
+                  </button>
+                </div>
+
+                {isInlineAddingCategory && (
+                  <div className="mb-3 p-2.5 bg-[#F8F9FA] rounded-xl border border-[#0B57D0]/40 flex items-center gap-2 animate-in fade-in duration-200">
+                    <input
+                      type="text"
+                      placeholder="Nome da nova categoria (ex: Livros)"
+                      value={inlineCategoryInput}
+                      onChange={e => setInlineCategoryInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleQuickCreateCategory();
+                        }
+                      }}
+                      autoFocus
+                      className="flex-1 bg-white border border-[#DADCE0] rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#0B57D0]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleQuickCreateCategory}
+                      className="bg-[#0B57D0] text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-[#0842A0] transition-colors"
+                    >
+                      Adicionar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsInlineAddingCategory(false);
+                        setInlineCategoryInput('');
+                      }}
+                      className="text-[#5F6368] hover:text-[#202124] p-1"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1 py-1 mb-2">
+                  {(state.categorias || DEFAULT_CATEGORIES).map(cat => {
+                    const currentCat = isCategoryManual 
+                      ? newExpenseCategory 
+                      : (getCategoryFromName(newExpenseName, state.categorias || DEFAULT_CATEGORIES) || 'Outros');
                     const isSelected = currentCat === cat;
+                    const catColor = getCategoryColor(cat);
                     return (
                       <button
                         key={cat}
@@ -1174,27 +1506,222 @@ export default function App() {
                           setNewExpenseCategory(cat);
                           setIsCategoryManual(true);
                         }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
                           isSelected
-                            ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs'
+                            ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs font-semibold'
                             : 'bg-[#F1F3F4] text-[#202124] border-transparent hover:bg-[#E8EAED]'
                         }`}
                       >
+                        <span 
+                          className="w-2 h-2 rounded-full shrink-0" 
+                          style={{ backgroundColor: isSelected ? '#FFFFFF' : catColor }} 
+                        />
                         {cat}
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    onClick={() => setIsInlineAddingCategory(true)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-[#0B57D0] text-[#0B57D0] hover:bg-[#E8F0FE] transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Criar nova
+                  </button>
                 </div>
-                <p className="text-xs text-[#5F6368]">Detectada automaticamente ou toque para escolher.</p>
+                <p className="text-xs text-[#5F6368]">Detectada automaticamente pelo nome ou toque para escolher.</p>
               </div>
               
               <button 
                 type="submit"
                 className="w-full bg-[#0F9D58] hover:bg-[#0B8043] text-white font-bold py-4 rounded-xl transition-colors mt-2 text-lg shadow-sm"
               >
-                Salvar Gasto
+                {editingGastoId ? 'Salvar Alterações' : 'Salvar Gasto'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gerenciar Categorias & Limites */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+            <div className="flex justify-between items-center pb-4 border-b border-[#F1F3F4] shrink-0">
+              <h2 className="text-xl font-bold text-[#041E49] flex items-center gap-2">
+                <Tag className="w-5 h-5 text-[#0B57D0]" />
+                Categorias & Limites de Gastos
+              </h2>
+              <button 
+                onClick={() => {
+                  setIsCategoryModalOpen(false);
+                  setNewCatName('');
+                  setNewCatTeto('');
+                }} 
+                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 py-4 space-y-6 pr-1">
+              {/* Form Nova Categoria */}
+              <div className="p-4 bg-[#F8F9FA] rounded-2xl border border-[#DADCE0]">
+                <h3 className="text-xs font-bold text-[#041E49] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <FolderPlus className="w-4 h-4 text-[#0B57D0]" />
+                  Adicionar Nova Categoria
+                </h3>
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newCatName.trim()) return;
+                    const parsedTeto = newCatTeto ? parseCurrency(newCatTeto) : undefined;
+                    handleAddCategory(newCatName, parsedTeto);
+                    setNewCatName('');
+                    setNewCatTeto('');
+                  }}
+                  className="space-y-3"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[#5F6368] mb-1">
+                        Nome da Categoria
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newCatName}
+                        onChange={e => setNewCatName(e.target.value)}
+                        placeholder="Ex: Academia, Livros, Cursos..."
+                        className="w-full border border-[#DADCE0] rounded-xl px-3.5 py-2.5 text-xs bg-white focus:outline-none focus:border-[#0B57D0]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[#5F6368] mb-1">
+                        Teto Mensal Opcional (R$)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={newCatTeto}
+                        onChange={e => setNewCatTeto(e.target.value)}
+                        placeholder="Ex: 300,00"
+                        className="w-full border border-[#DADCE0] rounded-xl px-3.5 py-2.5 text-xs bg-white focus:outline-none focus:border-[#0B57D0]"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-[#0B57D0] text-white py-2.5 rounded-xl font-bold text-xs hover:bg-[#0842A0] transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Criar Categoria
+                  </button>
+                </form>
+              </div>
+
+              {/* Lista de Categorias Ativas */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold text-[#5F6368] uppercase tracking-wider">
+                    Categorias Disponíveis ({(state.categorias || DEFAULT_CATEGORIES).length})
+                  </h3>
+                  <span className="text-[11px] text-[#5F6368]">
+                    {state.tetos.length} com limite definido
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {(state.categorias || DEFAULT_CATEGORIES).map(cat => {
+                    const catColor = getCategoryColor(cat);
+                    const associatedTeto = state.tetos.find(t => t.categoria.toLowerCase() === cat.toLowerCase());
+                    const gastosCount = state.gastos.filter(g => g.categoria.toLowerCase() === cat.toLowerCase()).length;
+                    const gastosTotal = state.gastos
+                      .filter(g => g.categoria.toLowerCase() === cat.toLowerCase())
+                      .reduce((sum, g) => sum + (Number(g.valor) || 0), 0);
+                    const isDefault = DEFAULT_CATEGORIES.includes(cat);
+
+                    return (
+                      <div 
+                        key={cat}
+                        className="flex items-center justify-between p-3 rounded-xl bg-[#F8F9FA] border border-[#E8EAED] hover:border-[#DADCE0] transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span 
+                            className="w-3 h-3 rounded-full shrink-0" 
+                            style={{ backgroundColor: catColor }} 
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm text-[#202124] truncate">{cat}</span>
+                              {isDefault ? (
+                                <span className="text-[10px] bg-[#E8EAED] text-[#5F6368] px-1.5 py-0.5 rounded font-normal">Padrão</span>
+                              ) : (
+                                <span className="text-[10px] bg-[#E8F0FE] text-[#0B57D0] px-1.5 py-0.5 rounded font-medium">Personalizada</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#5F6368]">
+                              {gastosCount > 0 ? `${gastosCount} gasto(s) • Total ${formatBRL(gastosTotal)}` : 'Sem gastos neste mês'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {associatedTeto ? (
+                            <div className="flex items-center gap-1.5 bg-[#E6F4EA] text-[#137333] px-2.5 py-1 rounded-lg text-xs font-semibold">
+                              <span>Teto: {formatBRL(associatedTeto.limite)}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveTeto(associatedTeto.id)}
+                                className="text-[#5F6368] hover:text-[#B3261E] ml-1"
+                                title="Remover teto desta categoria"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleAddCategory(cat, 300);
+                              }}
+                              className="text-xs text-[#0B57D0] hover:bg-[#E8F0FE] px-2.5 py-1 rounded-lg border border-[#0B57D0]/30 font-medium transition-colors"
+                            >
+                              + Limite (R$ 300)
+                            </button>
+                          )}
+
+                          {!isDefault && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(cat)}
+                              className="p-1.5 text-[#5F6368] hover:text-[#B3261E] hover:bg-[#F9DEDC] rounded-lg transition-colors ml-1"
+                              title="Excluir categoria"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-[#F1F3F4] shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCategoryModalOpen(false);
+                  setNewCatName('');
+                  setNewCatTeto('');
+                }}
+                className="w-full bg-[#F1F3F4] text-[#202124] py-3 rounded-xl font-medium text-sm hover:bg-[#E8EAED] transition-colors"
+              >
+                Concluir
+              </button>
+            </div>
           </div>
         </div>
       )}

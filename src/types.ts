@@ -35,4 +35,5 @@ export interface AppState {
   gastos: Gasto[];
   mesAtual: string;
   metasEconomia?: MetaEconomia[];
+  categorias?: string[];
 }
