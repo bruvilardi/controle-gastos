@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard } from 'lucide-react';
+import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, PieChart as PieChartIcon } from 'lucide-react';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { AppState, Conta, Gasto, Teto } from './types';
 import { db } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+
+const CATEGORY_COLORS: Record<string, string> = {
+  'Uber': '#1F2937',       // Dark Charcoal
+  'Delivery': '#EA4335',   // Coral Red
+  'Mercado': '#FBBC04',    // Gold Yellow
+  'Discos': '#4285F4',     // Google Blue
+  'Saúde': '#34A853',      // Emerald Green
+  'Transporte': '#0EA5E9', // Sky Blue
+  'Lazer': '#A855F7',      // Purple
+  'Outros': '#9AA0A6',     // Gray
+};
+
+const PALETTE_FALLBACK = ['#0B57D0', '#12B5CB', '#7C3AED', '#E65100', '#D93025', '#188038'];
 
 const INITIAL_STATE: AppState = {
   rendaMensal: 7914.00,
@@ -30,6 +44,7 @@ const INITIAL_STATE: AppState = {
     { id: 't1', categoria: 'Discos', limite: 800 },
     { id: 't2', categoria: 'Delivery', limite: 400 },
     { id: 't3', categoria: 'Mercado', limite: 1200 },
+    { id: 't4', categoria: 'Uber', limite: 300 },
   ],
   gastos: [],
 };
@@ -38,22 +53,37 @@ export default function App() {
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingSaldo, setIsEditingSaldo] = useState(false);
+  const [tempSaldoInput, setTempSaldoInput] = useState('');
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newExpenseName, setNewExpenseName] = useState('');
   const [newExpenseValue, setNewExpenseValue] = useState('');
   const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().substring(0, 10));
   const [newExpenseType, setNewExpenseType] = useState<'Fixo' | 'Parcela' | 'Variável'>('Variável');
+  const [newExpenseCategory, setNewExpenseCategory] = useState('Outros');
+  const [isCategoryManual, setIsCategoryManual] = useState(false);
 
   const getCategoryFromName = (name: string) => {
     const n = name.toLowerCase();
-    if (n.includes('farmácia') || n.includes('droga') || n.includes('médico') || n.includes('saúde') || n.includes('remedio') || n.includes('remédio')) return 'Saúde';
-    if (n.includes('mercado') || n.includes('padaria') || n.includes('ifood') || n.includes('restaurante') || n.includes('lanche') || n.includes('pizza') || n.includes('comida') || n.includes('assai') || n.includes('atacadão')) return 'Alimentação';
-    if (n.includes('uber') || n.includes('99') || n.includes('posto') || n.includes('gasolina') || n.includes('transporte') || n.includes('ônibus') || n.includes('metro')) return 'Transporte';
-    if (n.includes('disco') || n.includes('vinil') || n.includes('cd') || n.includes('música')) return 'Discos';
+    if (n.includes('uber') || n.includes('99') || n.includes('corrida') || n.includes('taxi') || n.includes('táxi')) return 'Uber';
+    if (n.includes('disco') || n.includes('vinil') || n.includes('cd') || n.includes('música') || n.includes('musica')) return 'Discos';
+    if (n.includes('delivery') || n.includes('ifood') || n.includes('rappi') || n.includes('pizza') || n.includes('hambúrguer') || n.includes('lanche')) return 'Delivery';
+    if (n.includes('mercado') || n.includes('padaria') || n.includes('supermercado') || n.includes('assai') || n.includes('atacadão') || n.includes('feira') || n.includes('compras')) return 'Mercado';
+    if (n.includes('farmácia') || n.includes('farmacia') || n.includes('droga') || n.includes('médico') || n.includes('medico') || n.includes('saúde') || n.includes('saude') || n.includes('remedio') || n.includes('remédio')) return 'Saúde';
+    if (n.includes('posto') || n.includes('gasolina') || n.includes('combustível') || n.includes('combustivel') || n.includes('ônibus') || n.includes('metro') || n.includes('transporte')) return 'Transporte';
     if (n.includes('roupa') || n.includes('shopping') || n.includes('cinema') || n.includes('lazer')) return 'Lazer';
-    if (n.includes('delivery')) return 'Delivery';
     return 'Outros';
+  };
+
+  const handleOpenAddModal = () => {
+    setNewExpenseName('');
+    setNewExpenseValue('');
+    setNewExpenseDate(new Date().toISOString().substring(0, 10));
+    setNewExpenseType('Variável');
+    setNewExpenseCategory('Outros');
+    setIsCategoryManual(false);
+    setIsAddModalOpen(true);
   };
 
   const handleSaveNewExpense = (e: React.FormEvent) => {
@@ -62,6 +92,10 @@ export default function App() {
     const val = Number(newExpenseValue.replace(',', '.'));
     
     if (newExpenseType === 'Variável') {
+      const finalCat = isCategoryManual && newExpenseCategory 
+        ? newExpenseCategory 
+        : (getCategoryFromName(newExpenseName) || 'Outros');
+
       setState(prev => ({
         ...prev,
         gastos: [{
@@ -69,7 +103,7 @@ export default function App() {
           descricao: newExpenseName,
           valor: val,
           data: newExpenseDate,
-          categoria: getCategoryFromName(newExpenseName)
+          categoria: finalCat
         }, ...prev.gastos]
       }));
     } else {
@@ -90,6 +124,8 @@ export default function App() {
     setNewExpenseValue('');
     setNewExpenseDate(new Date().toISOString().substring(0, 10));
     setNewExpenseType('Variável');
+    setNewExpenseCategory('Outros');
+    setIsCategoryManual(false);
   };
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('fin_auth') === 'true');
@@ -122,6 +158,25 @@ export default function App() {
         }
 
         const currentMonth = new Date().toISOString().substring(0, 7);
+        
+        // Ensure tetos contains Uber
+        if (!parsedState.tetos || parsedState.tetos.length === 0) {
+          parsedState.tetos = INITIAL_STATE.tetos;
+        } else {
+          if (!parsedState.tetos.some(t => t.categoria.toLowerCase() === 'uber')) {
+            parsedState.tetos.push({ id: 't4', categoria: 'Uber', limite: 300 });
+          }
+        }
+
+        // Ensure any past Uber expenses are tagged under Uber category
+        if (parsedState.gastos) {
+          parsedState.gastos = parsedState.gastos.map(g => {
+            if ((g.categoria === 'Transporte' || g.categoria === 'Outros') && g.descricao.toLowerCase().includes('uber')) {
+              return { ...g, categoria: 'Uber' };
+            }
+            return g;
+          });
+        }
         
         const advanceInstallments = (contas: Conta[]) => {
           return contas.map(c => {
@@ -188,13 +243,13 @@ export default function App() {
   const diaAtual = hoje.getDate();
   const mesAtual = hoje.toISOString().substring(0, 7); // YYYY-MM
 
+  // Filter current month expenses
+  const gastosMes = state.gastos.filter(g => !g.data || g.data.startsWith(mesAtual));
+  const totalGastosFatura = gastosMes.reduce((acc, g) => acc + g.valor, 0);
+
   // Calculations
   const totalContas = state.contas.reduce((acc, c) => acc + c.valor, 0);
-  const saldoLivre = state.saldoConta - totalContas - state.metaPoupanca;
-
-  // Filter current month expenses
-  const gastosMes = state.gastos.filter(g => g.data.startsWith(mesAtual));
-  const totalGastosFatura = gastosMes.reduce((acc, g) => acc + g.valor, 0);
+  const saldoLivre = state.saldoConta - totalContas - state.metaPoupanca - totalGastosFatura;
 
   const totalDiasMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
   const diasRestantes = Math.max(1, totalDiasMes - diaAtual + 1); // Include today
@@ -204,6 +259,15 @@ export default function App() {
     acc[g.categoria] = (acc[g.categoria] || 0) + g.valor;
     return acc;
   }, {} as Record<string, number>);
+
+  const pieChartData = (Object.entries(gastosPorCategoria) as [string, number][])
+    .filter(([_, valor]) => valor > 0)
+    .map(([categoria, valor]) => ({
+      name: categoria,
+      value: valor,
+      percentage: totalGastosFatura > 0 ? ((valor / totalGastosFatura) * 100).toFixed(1) : '0',
+    }))
+    .sort((a, b) => b.value - a.value);
 
   const handleResetGastos = () => {
     if (confirm("Tem certeza que deseja limpar todo o histórico de gastos variáveis?")) {
@@ -317,13 +381,102 @@ export default function App() {
         
         {/* Card Saldo Principal */}
         <section className="bg-white rounded-[28px] p-6 sm:p-8 shadow-sm border border-[#DADCE0]">
-          <h2 className="text-sm font-medium text-[#5F6368] uppercase tracking-wider mb-2 flex items-center gap-2">
-            <Wallet className="w-4 h-4" />
-            Saldo Livre
-          </h2>
-          <div className="text-5xl font-medium tracking-tight mb-2">
-            {formatBRL(saldoLivre)}
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-sm font-medium text-[#5F6368] uppercase tracking-wider flex items-center gap-2">
+              <Wallet className="w-4 h-4" />
+              Saldo Livre
+            </h2>
+            <button
+              onClick={() => {
+                if (isEditingSaldo) {
+                  const val = parseFloat(tempSaldoInput.replace(',', '.'));
+                  if (!isNaN(val)) {
+                    setState(prev => ({ ...prev, saldoConta: val }));
+                  }
+                  setIsEditingSaldo(false);
+                } else {
+                  setTempSaldoInput(state.saldoConta.toString());
+                  setIsEditingSaldo(true);
+                }
+              }}
+              className={`p-1.5 px-3 rounded-full text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                isEditingSaldo 
+                  ? 'bg-[#0B57D0] text-white hover:bg-[#0842A0]' 
+                  : 'bg-[#F1F3F4] text-[#5F6368] hover:bg-[#E8EAED] hover:text-[#202124]'
+              }`}
+              title="Ajustar saldo em conta"
+            >
+              {isEditingSaldo ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Salvar</span>
+                </>
+              ) : (
+                <>
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Ajustar Saldo</span>
+                </>
+              )}
+            </button>
           </div>
+
+          {isEditingSaldo ? (
+            <div className="my-3 p-4 bg-[#F8F9FA] rounded-2xl border border-[#0B57D0]/30 space-y-2 animate-in fade-in duration-200">
+              <label className="block text-xs font-bold text-[#041E49]">
+                Saldo Atual em Conta (R$):
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoFocus
+                  value={tempSaldoInput}
+                  onChange={e => setTempSaldoInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const val = parseFloat(tempSaldoInput.replace(',', '.'));
+                      if (!isNaN(val)) {
+                        setState(prev => ({ ...prev, saldoConta: val }));
+                      }
+                      setIsEditingSaldo(false);
+                    } else if (e.key === 'Escape') {
+                      setIsEditingSaldo(false);
+                    }
+                  }}
+                  placeholder="0,00"
+                  className="flex-1 bg-white border border-[#DADCE0] rounded-xl px-3 py-2 text-xl font-medium text-[#202124] focus:outline-none focus:border-[#0B57D0]"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const val = parseFloat(tempSaldoInput.replace(',', '.'));
+                    if (!isNaN(val)) {
+                      setState(prev => ({ ...prev, saldoConta: val }));
+                    }
+                    setIsEditingSaldo(false);
+                  }}
+                  className="bg-[#0B57D0] text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-[#0842A0] transition-colors"
+                >
+                  Salvar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingSaldo(false)}
+                  className="p-2.5 text-[#5F6368] hover:bg-[#E8EAED] rounded-xl transition-colors"
+                  title="Cancelar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-[#5F6368]">
+                Altere o saldo real do banco. O Saldo Livre e o limite diário serão recalculados imediatamente.
+              </p>
+            </div>
+          ) : (
+            <div className="text-5xl font-medium tracking-tight mb-2">
+              {formatBRL(saldoLivre)}
+            </div>
+          )}
           
           {!isEditing && (
             <div className="mt-6 p-4 bg-[#F8F9FA] rounded-[20px] border border-[#E8EAED]">
@@ -375,8 +528,8 @@ export default function App() {
               </div>
             ) : (
               <>
-                Seu saldo total é {formatBRL(state.saldoConta)}.<br/>
-                Já descontamos os {formatBRL(totalContas)} de contas a pagar e os {formatBRL(state.metaPoupanca)} da poupança.
+                Saldo base: {formatBRL(state.saldoConta)}.<br/>
+                Já descontados {formatBRL(totalContas)} de contas a pagar, {formatBRL(state.metaPoupanca)} de reserva/poupança e {formatBRL(totalGastosFatura)} em gastos variáveis deste mês.
               </>
             )}
           </div>
@@ -387,7 +540,7 @@ export default function App() {
           <h2 className="text-lg font-medium mb-1 text-[#202124]">Adicionar Nova Despesa</h2>
           <p className="text-sm mb-4 text-[#5F6368]">Registre compras variáveis, parcelamentos ou novas contas fixas.</p>
           <button 
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="w-full bg-[#0B57D0] text-white py-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#0842A0] transition-colors"
           >
             <Plus className="w-5 h-5" />
@@ -515,14 +668,88 @@ export default function App() {
 
         {/* Últimos Gastos */}
         <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0]">
-          <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <PiggyBank className="w-5 h-5 text-[#0B57D0]" />
-            Últimos Gastos
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium flex items-center gap-2">
+              <PiggyBank className="w-5 h-5 text-[#0B57D0]" />
+              Últimos Gastos
+            </h2>
+            {totalGastosFatura > 0 && (
+              <span className="text-xs font-semibold text-[#5F6368] bg-[#F1F3F4] px-2.5 py-1 rounded-full">
+                Total: {formatBRL(totalGastosFatura)}
+              </span>
+            )}
+          </div>
+
+          {/* Gráfico de Pizza de Distribuição Percentual */}
+          {pieChartData.length > 0 ? (
+            <div className="mb-6 p-4 bg-[#F8F9FA] rounded-[24px] border border-[#DADCE0]">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-xs font-bold text-[#5F6368] uppercase tracking-wider flex items-center gap-1.5">
+                  <PieChartIcon className="w-3.5 h-3.5 text-[#0B57D0]" />
+                  Distribuição por Categoria
+                </h3>
+                <span className="text-xs text-[#5F6368]">{pieChartData.length} categorias</span>
+              </div>
+              
+              <div className="w-full h-52 relative flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={48}
+                      outerRadius={74}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={CATEGORY_COLORS[entry.name] || PALETTE_FALLBACK[index % PALETTE_FALLBACK.length]} 
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(val: any, name: any, item: any) => [
+                        `${formatBRL(Number(val))} (${item.payload.percentage}%)`,
+                        name
+                      ]}
+                      contentStyle={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '12px',
+                        border: '1px solid #DADCE0',
+                        fontSize: '12px',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legenda com percentuais */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                {pieChartData.map((item, index) => {
+                  const color = CATEGORY_COLORS[item.name] || PALETTE_FALLBACK[index % PALETTE_FALLBACK.length];
+                  return (
+                    <div key={item.name} className="flex items-center gap-2 p-2 rounded-xl bg-white border border-[#E8EAED] text-xs">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      <span className="font-medium text-[#202124] truncate">{item.name}</span>
+                      <span className="text-[#0B57D0] font-bold ml-auto">{item.percentage}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           {state.gastos.length === 0 ? (
             <p className="text-sm text-[#5F6368] text-center py-4">Nenhum gasto registrado ainda.</p>
           ) : (
             <div className="space-y-3 mb-4">
+              <h3 className="text-xs font-bold text-[#5F6368] uppercase tracking-wider mb-2">
+                Histórico Recente
+              </h3>
               {state.gastos.slice(0, 5).map(g => (
                 <div key={g.id} className="flex justify-between items-center py-2 border-b border-[#F1F3F4] last:border-0">
                   <div>
@@ -572,8 +799,14 @@ export default function App() {
                   type="text" 
                   required
                   value={newExpenseName}
-                  onChange={e => setNewExpenseName(e.target.value)}
-                  placeholder="Ex: Farmácia, Supermercado..."
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNewExpenseName(val);
+                    if (!isCategoryManual) {
+                      setNewExpenseCategory(getCategoryFromName(val));
+                    }
+                  }}
+                  placeholder="Ex: Uber Centro, Mercado, Padaria..."
                   className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors"
                 />
               </div>
@@ -633,12 +866,31 @@ export default function App() {
               </div>
               
               <div>
-                <label className="block text-[#041E49] font-bold mb-1.5">Categoria (Automática)</label>
-                <div className="w-full bg-[#F4F6F8] border border-[#E3E8ED] rounded-xl px-4 py-3 flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-[#5F6368]" />
-                  <span className="font-bold text-[#041E49]">{getCategoryFromName(newExpenseName)}</span>
+                <label className="block text-[#041E49] font-bold mb-1.5">Categoria</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {['Uber', 'Delivery', 'Mercado', 'Discos', 'Saúde', 'Transporte', 'Lazer', 'Outros'].map(cat => {
+                    const currentCat = isCategoryManual ? newExpenseCategory : (getCategoryFromName(newExpenseName) || 'Outros');
+                    const isSelected = currentCat === cat;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          setNewExpenseCategory(cat);
+                          setIsCategoryManual(true);
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                          isSelected
+                            ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs'
+                            : 'bg-[#F1F3F4] text-[#202124] border-transparent hover:bg-[#E8EAED]'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    );
+                  })}
                 </div>
-                <p className="text-xs text-[#5F6368] mt-2">A categoria muda sozinha pelo nome do gasto!</p>
+                <p className="text-xs text-[#5F6368]">Detectada automaticamente ou toque para escolher.</p>
               </div>
               
               <button 
