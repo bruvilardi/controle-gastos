@@ -21,7 +21,6 @@ const PALETTE_FALLBACK = ['#0B57D0', '#12B5CB', '#7C3AED', '#E65100', '#D93025',
 const INITIAL_STATE: AppState = {
   rendaMensal: 7914.00,
   saldoConta: 7914.00,
-  metaPoupanca: 500,
   mesAtual: new Date().toISOString().substring(0, 7),
   contas: [
     { id: 'f1', nome: 'Boleto Partner Instituição', valor: 510.50, diaVencimento: 5, grupo: 'Gastos Fixos' },
@@ -70,9 +69,25 @@ const formatDateBR = (dateStr?: string) => {
   return dateStr;
 };
 
+const parseCurrency = (value: string | number): number => {
+  if (typeof value === 'number') return value;
+  let clean = value.replace(/[R$\s]/g, '');
+  if (clean.includes(',') && clean.includes('.')) {
+    if (clean.lastIndexOf(',') > clean.lastIndexOf('.')) {
+      clean = clean.replace(/\./g, '').replace(',', '.');
+    } else {
+      clean = clean.replace(/,/g, '');
+    }
+  } else if (clean.includes(',')) {
+    clean = clean.replace(',', '.');
+  }
+  return parseFloat(clean) || 0;
+};
+
 export default function App() {
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingSaldo, setIsEditingSaldo] = useState(false);
   const [tempSaldoInput, setTempSaldoInput] = useState('');
@@ -111,10 +126,8 @@ export default function App() {
   const handleSaveMeta = (e: React.FormEvent) => {
     e.preventDefault();
     if (!metaFormTitle) return;
-    const cleanAlvo = metaFormTarget.replace(/\s+/g, '').replace('R$', '').replace(',', '.');
-    const alvo = parseFloat(cleanAlvo) || 0;
-    const cleanAtual = metaFormCurrent.replace(/\s+/g, '').replace('R$', '').replace(',', '.');
-    const atual = parseFloat(cleanAtual) || 0;
+    const alvo = parseCurrency(metaFormTarget);
+    const atual = parseCurrency(metaFormCurrent);
     if (alvo <= 0) return;
 
     if (editingMetaId) {
@@ -143,12 +156,15 @@ export default function App() {
   };
 
   const handleDeleteMeta = (id: string) => {
-    if (confirm("Deseja remover esta meta de economia?")) {
-      setState(prev => ({
-        ...prev,
-        metasEconomia: (prev.metasEconomia || []).filter(m => m.id !== id),
-      }));
-    }
+    setConfirmDialog({
+      message: "Deseja remover esta meta de economia?",
+      onConfirm: () => {
+        setState(prev => ({
+          ...prev,
+          metasEconomia: (prev.metasEconomia || []).filter(m => m.id !== id),
+        }));
+      }
+    });
   };
 
   const handleQuickAddEconomia = (id: string, valorAporte: number) => {
@@ -185,8 +201,7 @@ export default function App() {
   const handleSaveNewExpense = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newExpenseName || !newExpenseValue) return;
-    const cleanVal = newExpenseValue.replace(/\s+/g, '').replace('R$', '').replace(',', '.');
-    const val = parseFloat(cleanVal);
+    const val = parseCurrency(newExpenseValue);
     if (isNaN(val) || val <= 0) return;
     
     const finalDate = newExpenseDate || getTodayLocal();
@@ -281,7 +296,7 @@ export default function App() {
 
         // Ensure metasEconomia is present
         if (!parsedState.metasEconomia || parsedState.metasEconomia.length === 0) {
-          const baseMeta = parsedState.metaPoupanca || 500;
+          const baseMeta = (parsedState as any).metaPoupanca || 500;
           parsedState.metasEconomia = [
             { id: 'm1', titulo: 'Poupança Mensal', valorAlvo: baseMeta, valorAtual: Math.round(baseMeta * 0.7) },
             { id: 'm2', titulo: 'Reserva de Emergência', valorAlvo: 300, valorAtual: 150 },
@@ -353,12 +368,21 @@ export default function App() {
   const diaAtual = hoje.getDate();
   const mesAtual = hoje.toISOString().substring(0, 7); // YYYY-MM
 
+  // Metas de Economia Mensal & Progresso Global
+  const metasEconomia = state.metasEconomia || [];
+  const totalMetaEconomiaAlvo = metasEconomia.reduce((acc, m) => acc + (Number(m.valorAlvo) || 0), 0);
+  const totalEconomizado = metasEconomia.reduce((acc, m) => acc + (Number(m.valorAtual) || 0), 0);
+  const progressoEconomiaGlobal = totalMetaEconomiaAlvo > 0 
+    ? Math.min(100, Math.round((totalEconomizado / totalMetaEconomiaAlvo) * 100)) 
+    : 0;
+  const faltaEconomizarGlobal = Math.max(0, totalMetaEconomiaAlvo - totalEconomizado);
+
   // Total de gastos variáveis registrados na fatura/mês
   const totalGastosFatura = state.gastos.reduce((acc, g) => acc + (Number(g.valor) || 0), 0);
 
   // Contas fixas e parceladas
   const totalContas = state.contas.reduce((acc, c) => acc + (Number(c.valor) || 0), 0);
-  const saldoLivre = state.saldoConta - totalContas - state.metaPoupanca - totalGastosFatura;
+  const saldoLivre = state.saldoConta - totalContas - totalMetaEconomiaAlvo - totalGastosFatura;
 
   const totalDiasMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
   const diasRestantes = Math.max(1, totalDiasMes - diaAtual + 1); // Include today
@@ -379,22 +403,16 @@ export default function App() {
     }))
     .sort((a, b) => b.value - a.value);
 
-  // Metas de Economia Mensal & Progresso Global
-  const metasEconomia = state.metasEconomia || [];
-  const totalMetaEconomiaAlvo = metasEconomia.reduce((acc, m) => acc + (Number(m.valorAlvo) || 0), 0);
-  const totalEconomizado = metasEconomia.reduce((acc, m) => acc + (Number(m.valorAtual) || 0), 0);
-  const progressoEconomiaGlobal = totalMetaEconomiaAlvo > 0 
-    ? Math.min(100, Math.round((totalEconomizado / totalMetaEconomiaAlvo) * 100)) 
-    : 0;
-  const faltaEconomizarGlobal = Math.max(0, totalMetaEconomiaAlvo - totalEconomizado);
-
   const handleResetGastos = () => {
-    if (confirm("Tem certeza que deseja limpar todo o histórico de gastos variáveis?")) {
-      setState(prev => ({
-        ...prev,
-        gastos: []
-      }));
-    }
+    setConfirmDialog({
+      message: "Tem certeza que deseja limpar todo o histórico de gastos variáveis?",
+      onConfirm: () => {
+        setState(prev => ({
+          ...prev,
+          gastos: []
+        }));
+      }
+    });
   };
 
   const formatBRL = (val: number) => 
@@ -408,21 +426,27 @@ export default function App() {
   };
 
   const handleRemoveConta = (id: string) => {
-    if (confirm("Deseja realmente remover esta conta?")) {
-      setState(prev => ({
-        ...prev,
-        contas: prev.contas.filter(c => c.id !== id)
-      }));
-    }
+    setConfirmDialog({
+      message: "Deseja realmente remover esta conta?",
+      onConfirm: () => {
+        setState(prev => ({
+          ...prev,
+          contas: prev.contas.filter(c => c.id !== id)
+        }));
+      }
+    });
   };
 
   const handleRemoveGasto = (id: string) => {
-    if (confirm("Deseja realmente remover este gasto?")) {
-      setState(prev => ({
-        ...prev,
-        gastos: prev.gastos.filter(g => g.id !== id)
-      }));
-    }
+    setConfirmDialog({
+      message: "Deseja realmente remover este gasto?",
+      onConfirm: () => {
+        setState(prev => ({
+          ...prev,
+          gastos: prev.gastos.filter(g => g.id !== id)
+        }));
+      }
+    });
   };
 
   const handleUpdateTeto = (id: string, limite: number) => {
@@ -508,7 +532,7 @@ export default function App() {
             <button
               onClick={() => {
                 if (isEditingSaldo) {
-                  const val = parseFloat(tempSaldoInput.replace(',', '.'));
+                  const val = parseCurrency(tempSaldoInput);
                   if (!isNaN(val)) {
                     setState(prev => ({ ...prev, saldoConta: val }));
                   }
@@ -553,7 +577,7 @@ export default function App() {
                   onChange={e => setTempSaldoInput(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
-                      const val = parseFloat(tempSaldoInput.replace(',', '.'));
+                      const val = parseCurrency(tempSaldoInput);
                       if (!isNaN(val)) {
                         setState(prev => ({ ...prev, saldoConta: val }));
                       }
@@ -568,7 +592,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    const val = parseFloat(tempSaldoInput.replace(',', '.'));
+                    const val = parseCurrency(tempSaldoInput);
                     if (!isNaN(val)) {
                       setState(prev => ({ ...prev, saldoConta: val }));
                     }
@@ -635,20 +659,11 @@ export default function App() {
                     className="border border-[#DADCE0] rounded-lg px-3 py-1.5 w-32 text-right bg-white" 
                   />
                 </label>
-                <label className="flex justify-between items-center">
-                  <span className="font-medium text-[#202124]">Meta Poupança:</span>
-                  <input 
-                    type="number" 
-                    value={state.metaPoupanca || ''} 
-                    onChange={e => setState({...state, metaPoupanca: Number(e.target.value)})}
-                    className="border border-[#DADCE0] rounded-lg px-3 py-1.5 w-32 text-right bg-white" 
-                  />
-                </label>
               </div>
             ) : (
               <>
                 Saldo base: {formatBRL(state.saldoConta)}.<br/>
-                Já descontados {formatBRL(totalContas)} de contas a pagar, {formatBRL(state.metaPoupanca)} de reserva/poupança e {formatBRL(totalGastosFatura)} em gastos variáveis deste mês.
+                Já descontados {formatBRL(totalContas)} de contas a pagar, {formatBRL(totalMetaEconomiaAlvo)} de metas de economia e {formatBRL(totalGastosFatura)} em gastos variáveis deste mês.
               </>
             )}
           </div>
@@ -1265,6 +1280,33 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog Modal */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[24px] p-6 shadow-xl animate-in zoom-in-95 duration-300">
+            <h3 className="text-lg font-bold text-[#202124] mb-3">Confirmação</h3>
+            <p className="text-sm text-[#5F6368] mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-5 py-2.5 rounded-full font-medium text-sm text-[#5F6368] hover:bg-[#F1F3F4] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className="px-5 py-2.5 rounded-full font-bold text-sm bg-[#B3261E] text-white hover:bg-[#8C1D18] transition-colors shadow-sm"
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </div>
       )}

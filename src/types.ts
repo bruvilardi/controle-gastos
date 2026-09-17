@@ -30,7 +30,6 @@ export interface MetaEconomia {
 export interface AppState {
   rendaMensal: number;
   saldoConta: number;
-  metaPoupanca: number;
   contas: Conta[];
   tetos: Teto[];
   gastos: Gasto[];
