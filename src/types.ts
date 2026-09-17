@@ -20,6 +20,13 @@ export interface Teto {
   limite: number;
 }
 
+export interface MetaEconomia {
+  id: string;
+  titulo: string;
+  valorAlvo: number;
+  valorAtual: number;
+}
+
 export interface AppState {
   rendaMensal: number;
   saldoConta: number;
@@ -28,4 +35,5 @@ export interface AppState {
   tetos: Teto[];
   gastos: Gasto[];
   mesAtual: string;
+  metasEconomia?: MetaEconomia[];
 }

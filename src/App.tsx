@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, PieChart as PieChartIcon } from 'lucide-react';
+import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, PieChart as PieChartIcon, TrendingUp, Coins } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { AppState, Conta, Gasto, Teto } from './types';
+import { AppState, Conta, Gasto, Teto, MetaEconomia } from './types';
 import { db } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -47,6 +47,27 @@ const INITIAL_STATE: AppState = {
     { id: 't4', categoria: 'Uber', limite: 300 },
   ],
   gastos: [],
+  metasEconomia: [
+    { id: 'm1', titulo: 'Poupança Mensal', valorAlvo: 500, valorAtual: 350 },
+    { id: 'm2', titulo: 'Reserva de Emergência', valorAlvo: 300, valorAtual: 150 },
+  ],
+};
+
+const getTodayLocal = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDateBR = (dateStr?: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
 };
 
 export default function App() {
@@ -59,10 +80,85 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newExpenseName, setNewExpenseName] = useState('');
   const [newExpenseValue, setNewExpenseValue] = useState('');
-  const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().substring(0, 10));
+  const [newExpenseDate, setNewExpenseDate] = useState(getTodayLocal());
   const [newExpenseType, setNewExpenseType] = useState<'Fixo' | 'Parcela' | 'Variável'>('Variável');
   const [newExpenseCategory, setNewExpenseCategory] = useState('Outros');
   const [isCategoryManual, setIsCategoryManual] = useState(false);
+
+  // Metas de Economia state & handlers
+  const [isMetaModalOpen, setIsMetaModalOpen] = useState(false);
+  const [editingMetaId, setEditingMetaId] = useState<string | null>(null);
+  const [metaFormTitle, setMetaFormTitle] = useState('');
+  const [metaFormTarget, setMetaFormTarget] = useState('');
+  const [metaFormCurrent, setMetaFormCurrent] = useState('');
+
+  const handleOpenNewMeta = () => {
+    setEditingMetaId(null);
+    setMetaFormTitle('');
+    setMetaFormTarget('');
+    setMetaFormCurrent('');
+    setIsMetaModalOpen(true);
+  };
+
+  const handleOpenEditMeta = (meta: MetaEconomia) => {
+    setEditingMetaId(meta.id);
+    setMetaFormTitle(meta.titulo);
+    setMetaFormTarget(meta.valorAlvo.toString());
+    setMetaFormCurrent(meta.valorAtual.toString());
+    setIsMetaModalOpen(true);
+  };
+
+  const handleSaveMeta = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!metaFormTitle) return;
+    const cleanAlvo = metaFormTarget.replace(/\s+/g, '').replace('R$', '').replace(',', '.');
+    const alvo = parseFloat(cleanAlvo) || 0;
+    const cleanAtual = metaFormCurrent.replace(/\s+/g, '').replace('R$', '').replace(',', '.');
+    const atual = parseFloat(cleanAtual) || 0;
+    if (alvo <= 0) return;
+
+    if (editingMetaId) {
+      setState(prev => {
+        const metas = (prev.metasEconomia || []).map(m =>
+          m.id === editingMetaId ? { ...m, titulo: metaFormTitle, valorAlvo: alvo, valorAtual: atual } : m
+        );
+        return {
+          ...prev,
+          metasEconomia: metas,
+        };
+      });
+    } else {
+      const newMeta: MetaEconomia = {
+        id: Math.random().toString(36).substr(2, 9),
+        titulo: metaFormTitle,
+        valorAlvo: alvo,
+        valorAtual: atual,
+      };
+      setState(prev => ({
+        ...prev,
+        metasEconomia: [...(prev.metasEconomia || []), newMeta],
+      }));
+    }
+    setIsMetaModalOpen(false);
+  };
+
+  const handleDeleteMeta = (id: string) => {
+    if (confirm("Deseja remover esta meta de economia?")) {
+      setState(prev => ({
+        ...prev,
+        metasEconomia: (prev.metasEconomia || []).filter(m => m.id !== id),
+      }));
+    }
+  };
+
+  const handleQuickAddEconomia = (id: string, valorAporte: number) => {
+    setState(prev => ({
+      ...prev,
+      metasEconomia: (prev.metasEconomia || []).map(m =>
+        m.id === id ? { ...m, valorAtual: Math.max(0, m.valorAtual + valorAporte) } : m
+      )
+    }));
+  };
 
   const getCategoryFromName = (name: string) => {
     const n = name.toLowerCase();
@@ -79,7 +175,7 @@ export default function App() {
   const handleOpenAddModal = () => {
     setNewExpenseName('');
     setNewExpenseValue('');
-    setNewExpenseDate(new Date().toISOString().substring(0, 10));
+    setNewExpenseDate(getTodayLocal());
     setNewExpenseType('Variável');
     setNewExpenseCategory('Outros');
     setIsCategoryManual(false);
@@ -89,8 +185,12 @@ export default function App() {
   const handleSaveNewExpense = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newExpenseName || !newExpenseValue) return;
-    const val = Number(newExpenseValue.replace(',', '.'));
+    const cleanVal = newExpenseValue.replace(/\s+/g, '').replace('R$', '').replace(',', '.');
+    const val = parseFloat(cleanVal);
+    if (isNaN(val) || val <= 0) return;
     
+    const finalDate = newExpenseDate || getTodayLocal();
+
     if (newExpenseType === 'Variável') {
       const finalCat = isCategoryManual && newExpenseCategory 
         ? newExpenseCategory 
@@ -102,18 +202,19 @@ export default function App() {
           id: Math.random().toString(36).substr(2, 9),
           descricao: newExpenseName,
           valor: val,
-          data: newExpenseDate,
+          data: finalDate,
           categoria: finalCat
         }, ...prev.gastos]
       }));
     } else {
+      const dia = Number(finalDate.split('-')[2]) || new Date().getDate();
       setState(prev => ({
         ...prev,
         contas: [...prev.contas, {
           id: Math.random().toString(36).substr(2, 9),
           nome: newExpenseName,
           valor: val,
-          diaVencimento: Number(newExpenseDate.split('-')[2]),
+          diaVencimento: dia,
           grupo: newExpenseType === 'Fixo' ? 'Gastos Fixos' : 'Parcelamentos'
         }]
       }));
@@ -122,7 +223,7 @@ export default function App() {
     setIsAddModalOpen(false);
     setNewExpenseName('');
     setNewExpenseValue('');
-    setNewExpenseDate(new Date().toISOString().substring(0, 10));
+    setNewExpenseDate(getTodayLocal());
     setNewExpenseType('Variável');
     setNewExpenseCategory('Outros');
     setIsCategoryManual(false);
@@ -176,6 +277,15 @@ export default function App() {
             }
             return g;
           });
+        }
+
+        // Ensure metasEconomia is present
+        if (!parsedState.metasEconomia || parsedState.metasEconomia.length === 0) {
+          const baseMeta = parsedState.metaPoupanca || 500;
+          parsedState.metasEconomia = [
+            { id: 'm1', titulo: 'Poupança Mensal', valorAlvo: baseMeta, valorAtual: Math.round(baseMeta * 0.7) },
+            { id: 'm2', titulo: 'Reserva de Emergência', valorAlvo: 300, valorAtual: 150 },
+          ];
         }
         
         const advanceInstallments = (contas: Conta[]) => {
@@ -243,20 +353,20 @@ export default function App() {
   const diaAtual = hoje.getDate();
   const mesAtual = hoje.toISOString().substring(0, 7); // YYYY-MM
 
-  // Filter current month expenses
-  const gastosMes = state.gastos.filter(g => !g.data || g.data.startsWith(mesAtual));
-  const totalGastosFatura = gastosMes.reduce((acc, g) => acc + g.valor, 0);
+  // Total de gastos variáveis registrados na fatura/mês
+  const totalGastosFatura = state.gastos.reduce((acc, g) => acc + (Number(g.valor) || 0), 0);
 
-  // Calculations
-  const totalContas = state.contas.reduce((acc, c) => acc + c.valor, 0);
+  // Contas fixas e parceladas
+  const totalContas = state.contas.reduce((acc, c) => acc + (Number(c.valor) || 0), 0);
   const saldoLivre = state.saldoConta - totalContas - state.metaPoupanca - totalGastosFatura;
 
   const totalDiasMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
   const diasRestantes = Math.max(1, totalDiasMes - diaAtual + 1); // Include today
   const limiteDiario = Math.max(0, saldoLivre / diasRestantes);
 
-  const gastosPorCategoria = gastosMes.reduce((acc, g) => {
-    acc[g.categoria] = (acc[g.categoria] || 0) + g.valor;
+  const gastosPorCategoria = state.gastos.reduce((acc, g) => {
+    const val = Number(g.valor) || 0;
+    acc[g.categoria] = (acc[g.categoria] || 0) + val;
     return acc;
   }, {} as Record<string, number>);
 
@@ -268,6 +378,15 @@ export default function App() {
       percentage: totalGastosFatura > 0 ? ((valor / totalGastosFatura) * 100).toFixed(1) : '0',
     }))
     .sort((a, b) => b.value - a.value);
+
+  // Metas de Economia Mensal & Progresso Global
+  const metasEconomia = state.metasEconomia || [];
+  const totalMetaEconomiaAlvo = metasEconomia.reduce((acc, m) => acc + (Number(m.valorAlvo) || 0), 0);
+  const totalEconomizado = metasEconomia.reduce((acc, m) => acc + (Number(m.valorAtual) || 0), 0);
+  const progressoEconomiaGlobal = totalMetaEconomiaAlvo > 0 
+    ? Math.min(100, Math.round((totalEconomizado / totalMetaEconomiaAlvo) * 100)) 
+    : 0;
+  const faltaEconomizarGlobal = Math.max(0, totalMetaEconomiaAlvo - totalEconomizado);
 
   const handleResetGastos = () => {
     if (confirm("Tem certeza que deseja limpar todo o histórico de gastos variáveis?")) {
@@ -595,6 +714,167 @@ export default function App() {
           </div>
         </section>
 
+        {/* Metas de Economia Mensal com Barra de Progresso Global */}
+        <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0]">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium flex items-center gap-2 text-[#202124]">
+              <TrendingUp className="w-5 h-5 text-[#0B57D0]" />
+              Metas de Economia Mensal
+            </h2>
+            <button
+              onClick={handleOpenNewMeta}
+              className="bg-[#E8F0FE] text-[#0B57D0] hover:bg-[#D2E3FC] px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nova Meta</span>
+            </button>
+          </div>
+
+          {/* Barra de Progresso Global */}
+          <div className="p-5 bg-[#F8F9FA] rounded-[24px] border border-[#DADCE0] mb-5">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <span className="text-[11px] font-bold text-[#5F6368] uppercase tracking-wider block">
+                  Progresso Global de Economia
+                </span>
+                <div className="text-2xl font-bold text-[#202124] mt-0.5">
+                  {formatBRL(totalEconomizado)}{' '}
+                  <span className="text-sm font-normal text-[#5F6368]">
+                    de {formatBRL(totalMetaEconomiaAlvo)}
+                  </span>
+                </div>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                progressoEconomiaGlobal >= 100 
+                  ? 'bg-[#E6F4EA] text-[#137333]' 
+                  : progressoEconomiaGlobal >= 50 
+                  ? 'bg-[#E8F0FE] text-[#0B57D0]' 
+                  : 'bg-[#FEF7E0] text-[#B06000]'
+              }`}>
+                <Coins className="w-3.5 h-3.5" />
+                <span>{progressoEconomiaGlobal}% atingido</span>
+              </div>
+            </div>
+
+            {/* Barra de Progresso Visual Global */}
+            <div className="w-full h-4 bg-[#E8EAED] rounded-full overflow-hidden relative mt-3">
+              <div 
+                className={`h-full transition-all duration-700 rounded-full ${
+                  progressoEconomiaGlobal >= 100 
+                    ? 'bg-[#146C2E]' 
+                    : progressoEconomiaGlobal >= 70 
+                    ? 'bg-[#0B57D0]' 
+                    : 'bg-[#0EA5E9]'
+                }`}
+                style={{ width: `${progressoEconomiaGlobal}%` }}
+              />
+            </div>
+
+            <div className="flex justify-between items-center mt-2.5 text-xs">
+              <div className="text-[#5F6368]">
+                {progressoEconomiaGlobal >= 100 ? (
+                  <span className="text-[#137333] font-medium flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Parabéns! Você atingiu sua meta global mensal!
+                  </span>
+                ) : (
+                  <span>
+                    Faltam <strong className="text-[#202124]">{formatBRL(faltaEconomizarGlobal)}</strong> para bater o objetivo deste mês.
+                  </span>
+                )}
+              </div>
+              <span className="font-semibold text-[#202124] text-[11px]">
+                {metasEconomia.length} {metasEconomia.length === 1 ? 'meta ativa' : 'metas ativas'}
+              </span>
+            </div>
+          </div>
+
+          {/* Lista de Metas Individuais */}
+          {metasEconomia.length === 0 ? (
+            <div className="text-center py-6 text-sm text-[#5F6368]">
+              <PiggyBank className="w-8 h-8 text-[#BDC1C6] mx-auto mb-2" />
+              <p>Nenhuma meta de economia cadastrada ainda.</p>
+              <button
+                onClick={handleOpenNewMeta}
+                className="mt-2 text-xs text-[#0B57D0] font-bold hover:underline"
+              >
+                + Criar primeira meta mensal
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3.5">
+              {metasEconomia.map(meta => {
+                const pctIndividual = meta.valorAlvo > 0 ? Math.min(100, Math.round((meta.valorAtual / meta.valorAlvo) * 100)) : 0;
+                const concluida = meta.valorAtual >= meta.valorAlvo;
+
+                return (
+                  <div key={meta.id} className="p-4 rounded-[20px] bg-[#F8F9FA] border border-[#E8EAED] hover:border-[#DADCE0] transition-colors">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-semibold text-[#202124] text-sm flex items-center gap-1.5">
+                          {meta.titulo}
+                          {concluida && <CheckCircle2 className="w-4 h-4 text-[#137333]" />}
+                        </h4>
+                        <p className="text-xs text-[#5F6368] mt-0.5">
+                          Guardado: <strong className="text-[#202124]">{formatBRL(meta.valorAtual)}</strong> de {formatBRL(meta.valorAlvo)}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenEditMeta(meta)}
+                          className="p-1.5 text-[#5F6368] hover:text-[#0B57D0] hover:bg-[#E8F0FE] rounded-lg transition-colors"
+                          title="Editar meta"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMeta(meta.id)}
+                          className="p-1.5 text-[#5F6368] hover:text-[#B3261E] hover:bg-[#FCE8E6] rounded-lg transition-colors"
+                          title="Excluir meta"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Barra individual */}
+                    <div className="w-full h-2.5 bg-[#E8EAED] rounded-full overflow-hidden mb-2.5">
+                      <div
+                        className={`h-full transition-all duration-500 rounded-full ${
+                          concluida ? 'bg-[#146C2E]' : 'bg-[#0B57D0]'
+                        }`}
+                        style={{ width: `${pctIndividual}%` }}
+                      />
+                    </div>
+
+                    {/* Ações rápidas */}
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[11px] font-medium text-[#5F6368]">
+                        {concluida ? 'Objetivo alcançado!' : `${pctIndividual}% economizado`}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-[#5F6368] mr-1 hidden sm:inline">Aporte rápido:</span>
+                        <button
+                          onClick={() => handleQuickAddEconomia(meta.id, 50)}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-[#DADCE0] text-[11px] font-semibold text-[#202124] hover:bg-[#F1F3F4] transition-colors"
+                        >
+                          + R$ 50
+                        </button>
+                        <button
+                          onClick={() => handleQuickAddEconomia(meta.id, 100)}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-[#DADCE0] text-[11px] font-semibold text-[#202124] hover:bg-[#F1F3F4] transition-colors"
+                        >
+                          + R$ 100
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* Contas a Pagar */}
         <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0]">
           <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
@@ -754,7 +1034,7 @@ export default function App() {
                 <div key={g.id} className="flex justify-between items-center py-2 border-b border-[#F1F3F4] last:border-0">
                   <div>
                     <p className="font-medium">{g.descricao}</p>
-                    <p className="text-xs text-[#5F6368]">{g.categoria} • {new Date(g.data).toLocaleDateString('pt-BR')}</p>
+                    <p className="text-xs text-[#5F6368]">{g.categoria} • {formatDateBR(g.data)}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-medium">{formatBRL(g.valor)}</span>
@@ -899,6 +1179,91 @@ export default function App() {
               >
                 Salvar Gasto
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nova / Editar Meta de Economia */}
+      {isMetaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xl font-bold text-[#041E49] flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-[#0B57D0]" />
+                {editingMetaId ? 'Editar Meta de Economia' : 'Nova Meta de Economia'}
+              </h2>
+              <button 
+                onClick={() => setIsMetaModalOpen(false)} 
+                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMeta} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#041E49] mb-1.5 uppercase tracking-wide">
+                  Título da Meta
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={metaFormTitle}
+                  onChange={e => setMetaFormTitle(e.target.value)}
+                  placeholder="Ex: Reserva de Emergência, Viagem, Investimentos..."
+                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#041E49] mb-1.5 uppercase tracking-wide">
+                  Objetivo / Meta Mensal (R$)
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  required
+                  value={metaFormTarget}
+                  onChange={e => setMetaFormTarget(e.target.value)}
+                  placeholder="Ex: 500,00"
+                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#041E49] mb-1.5 uppercase tracking-wide">
+                  Valor Já Guardado / Aporte Inicial (R$)
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={metaFormCurrent}
+                  onChange={e => setMetaFormCurrent(e.target.value)}
+                  placeholder="Ex: 150,00"
+                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white text-sm"
+                />
+                <p className="text-xs text-[#5F6368] mt-1.5">
+                  Quanto você já guardou ou possui reservado para esta meta neste mês.
+                </p>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsMetaModalOpen(false)}
+                  className="flex-1 bg-[#F1F3F4] text-[#202124] py-3.5 rounded-xl font-medium text-sm hover:bg-[#E8EAED] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#0B57D0] text-white py-3.5 rounded-xl font-bold text-sm hover:bg-[#0842A0] transition-colors shadow-sm"
+                >
+                  Salvar Meta
+                </button>
+              </div>
             </form>
           </div>
         </div>
