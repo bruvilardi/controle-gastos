@@ -4,6 +4,7 @@ export interface Gasto {
   categoria: string;
   descricao: string;
   data: string; // ISO date
+  formaPagamento?: 'debito' | 'credito';
 }
 
 export interface Conta {
@@ -27,9 +28,18 @@ export interface MetaEconomia {
   valorAtual: number;
 }
 
+export interface ItemSaldo {
+  id: string;
+  descricao: string;
+  valor: number;
+  origem?: string; // 'Salário' | 'Freela' | 'Vendas' | 'Investimentos' | 'Outros'
+  data?: string;
+}
+
 export interface AppState {
   rendaMensal: number;
   saldoConta: number;
+  itensSaldo?: ItemSaldo[];
   contas: Conta[];
   tetos: Teto[];
   gastos: Gasto[];

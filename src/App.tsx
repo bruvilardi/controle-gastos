@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, PieChart as PieChartIcon, TrendingUp, Coins, Tag, FolderPlus, Settings2, Download } from 'lucide-react';
+import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, Banknote, PieChart as PieChartIcon, TrendingUp, Coins, Tag, FolderPlus, Settings2, Download, Briefcase, Laptop, ShoppingBag, ChevronDown, ChevronUp, ArrowDownLeft } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { AppState, Conta, Gasto, Teto, MetaEconomia } from './types';
+import { AppState, Conta, Gasto, Teto, MetaEconomia, ItemSaldo } from './types';
 import { db } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -59,9 +59,44 @@ export const getCategoryColor = (cat: string, index = 0): string => {
   return PALETTE_FALLBACK[colorIndex] || PALETTE_FALLBACK[index % PALETTE_FALLBACK.length];
 };
 
+export const ORIGENS_ENTRADA = ['Salário', 'Freela', 'Vendas', 'Investimentos', 'Outros'];
+
+export const getOrigemIcon = (origem?: string) => {
+  switch (origem) {
+    case 'Salário':
+      return <Briefcase className="w-4 h-4 text-[#0B57D0]" />;
+    case 'Freela':
+      return <Laptop className="w-4 h-4 text-[#7C3AED]" />;
+    case 'Vendas':
+      return <ShoppingBag className="w-4 h-4 text-[#E67C3B]" />;
+    case 'Investimentos':
+      return <TrendingUp className="w-4 h-4 text-[#0F9D58]" />;
+    default:
+      return <Coins className="w-4 h-4 text-[#5F6368]" />;
+  }
+};
+
+export const getOrigemBadgeClass = (origem?: string) => {
+  switch (origem) {
+    case 'Salário':
+      return 'bg-[#E8F0FE] text-[#0B57D0] border-[#D2E3FC]';
+    case 'Freela':
+      return 'bg-[#F3E8FF] text-[#7C3AED] border-[#E9D5FF]';
+    case 'Vendas':
+      return 'bg-[#FFF8F3] text-[#A0460A] border-[#FED7AA]';
+    case 'Investimentos':
+      return 'bg-[#E6F4EA] text-[#0F9D58] border-[#CEEAD6]';
+    default:
+      return 'bg-[#F1F3F4] text-[#5F6368] border-[#DADCE0]';
+  }
+};
+
 const INITIAL_STATE: AppState = {
   rendaMensal: 7914.00,
   saldoConta: 7914.00,
+  itensSaldo: [
+    { id: 'sal-1', descricao: 'Salário Mensal', valor: 7914.00, origem: 'Salário' }
+  ],
   mesAtual: new Date().toISOString().substring(0, 7),
   contas: [
     { id: 'f1', nome: 'Boleto Partner Instituição', valor: 510.50, diaVencimento: 5, grupo: 'Gastos Fixos' },
@@ -144,7 +179,9 @@ export default function App() {
   const [tipoValorParcela, setTipoValorParcela] = useState<'parcela' | 'total'>('parcela');
   const [newExpenseCategory, setNewExpenseCategory] = useState('Outros');
   const [isCategoryManual, setIsCategoryManual] = useState(false);
+  const [newExpenseForma, setNewExpenseForma] = useState<'credito' | 'debito'>('credito');
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
+  const [filtroFormaPagamento, setFiltroFormaPagamento] = useState<'todos' | 'credito' | 'debito'>('todos');
   const [showAllGastos, setShowAllGastos] = useState(false);
 
   // Categorias management states
@@ -228,6 +265,97 @@ export default function App() {
         m.id === id ? { ...m, valorAtual: Math.max(0, m.valorAtual + valorAporte) } : m
       )
     }));
+  };
+
+  // Descritivo do Saldo (Entradas / Freelas / Vendas / Salário)
+  const [isItemSaldoModalOpen, setIsItemSaldoModalOpen] = useState(false);
+  const [editingItemSaldoId, setEditingItemSaldoId] = useState<string | null>(null);
+  const [itemSaldoDescricao, setItemSaldoDescricao] = useState('');
+  const [itemSaldoValor, setItemSaldoValor] = useState('');
+  const [itemSaldoOrigem, setItemSaldoOrigem] = useState('Freela');
+  const [itemSaldoData, setItemSaldoData] = useState(getTodayLocal());
+  const [isDescritivoSaldoExpanded, setIsDescritivoSaldoExpanded] = useState(true);
+
+  const handleOpenAddItemSaldo = (origemDefault = 'Freela') => {
+    setEditingItemSaldoId(null);
+    setItemSaldoDescricao('');
+    setItemSaldoValor('');
+    setItemSaldoOrigem(origemDefault);
+    setItemSaldoData(getTodayLocal());
+    setIsItemSaldoModalOpen(true);
+  };
+
+  const handleOpenEditItemSaldo = (item: ItemSaldo) => {
+    setEditingItemSaldoId(item.id);
+    setItemSaldoDescricao(item.descricao);
+    setItemSaldoValor(item.valor.toString());
+    setItemSaldoOrigem(item.origem || 'Outros');
+    setItemSaldoData(item.data || getTodayLocal());
+    setIsItemSaldoModalOpen(true);
+  };
+
+  const handleSaveItemSaldo = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseCurrency(itemSaldoValor);
+    if (isNaN(val) || val <= 0) return;
+
+    setState(prev => {
+      const currentItens: ItemSaldo[] = prev.itensSaldo && prev.itensSaldo.length > 0
+        ? [...prev.itensSaldo]
+        : [{ id: 'sal-base', descricao: 'Salário Base', valor: prev.saldoConta, origem: 'Salário' }];
+
+      let updatedItens: ItemSaldo[];
+      if (editingItemSaldoId) {
+        updatedItens = currentItens.map(it =>
+          it.id === editingItemSaldoId
+            ? { ...it, descricao: itemSaldoDescricao.trim() || itemSaldoOrigem, valor: val, origem: itemSaldoOrigem, data: itemSaldoData }
+            : it
+        );
+      } else {
+        const newItem: ItemSaldo = {
+          id: 'sal_' + Math.random().toString(36).substr(2, 9),
+          descricao: itemSaldoDescricao.trim() || itemSaldoOrigem,
+          valor: val,
+          origem: itemSaldoOrigem,
+          data: itemSaldoData
+        };
+        updatedItens = [newItem, ...currentItens];
+      }
+
+      const newTotalSaldo = updatedItens.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+
+      return {
+        ...prev,
+        itensSaldo: updatedItens,
+        saldoConta: newTotalSaldo
+      };
+    });
+
+    setIsItemSaldoModalOpen(false);
+    setEditingItemSaldoId(null);
+    setItemSaldoDescricao('');
+    setItemSaldoValor('');
+  };
+
+  const handleRemoveItemSaldo = (id: string) => {
+    const currentItens = state.itensSaldo || [];
+    const target = currentItens.find(it => it.id === id);
+    if (!target) return;
+
+    setConfirmDialog({
+      message: `Deseja remover "${target.descricao}" (${formatBRL(target.valor)}) das suas entradas de saldo?`,
+      onConfirm: () => {
+        setState(prev => {
+          const updatedItens = (prev.itensSaldo || []).filter(it => it.id !== id);
+          const newTotalSaldo = updatedItens.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+          return {
+            ...prev,
+            itensSaldo: updatedItens,
+            saldoConta: newTotalSaldo
+          };
+        });
+      }
+    });
   };
 
   // Category Management Handlers
@@ -344,6 +472,7 @@ export default function App() {
     setTipoValorParcela('parcela');
     setNewExpenseCategory('Outros');
     setIsCategoryManual(false);
+    setNewExpenseForma('credito');
     setIsInlineAddingCategory(false);
     setInlineCategoryInput('');
     setIsAddModalOpen(true);
@@ -357,9 +486,26 @@ export default function App() {
     setNewExpenseType('Variável');
     setNewExpenseCategory(gasto.categoria || 'Outros');
     setIsCategoryManual(true);
+    setNewExpenseForma(gasto.formaPagamento || 'credito');
     setIsInlineAddingCategory(false);
     setInlineCategoryInput('');
     setIsAddModalOpen(true);
+  };
+
+  const handleToggleFormaPagamento = (gastoId: string) => {
+    setState(prev => ({
+      ...prev,
+      gastos: prev.gastos.map(g => {
+        if (g.id === gastoId) {
+          const atual = g.formaPagamento || 'credito';
+          return {
+            ...g,
+            formaPagamento: atual === 'credito' ? 'debito' : 'credito'
+          };
+        }
+        return g;
+      })
+    }));
   };
 
   const handleSaveNewExpense = (e: React.FormEvent) => {
@@ -382,7 +528,8 @@ export default function App() {
           descricao: newExpenseName.trim(),
           valor: val,
           data: finalDate,
-          categoria: finalCat
+          categoria: finalCat,
+          formaPagamento: newExpenseForma
         } : g)
       }));
     } else if (newExpenseType === 'Variável') {
@@ -393,7 +540,8 @@ export default function App() {
           descricao: newExpenseName.trim(),
           valor: val,
           data: finalDate,
-          categoria: finalCat
+          categoria: finalCat,
+          formaPagamento: newExpenseForma
         }, ...prev.gastos]
       }));
     } else if (newExpenseType === 'Parcela') {
@@ -505,6 +653,13 @@ export default function App() {
           ];
         }
 
+        // Ensure itensSaldo is present
+        if (!parsedState.itensSaldo || parsedState.itensSaldo.length === 0) {
+          parsedState.itensSaldo = [
+            { id: 'sal-1', descricao: 'Salário Mensal', valor: parsedState.saldoConta || parsedState.rendaMensal || 7914.00, origem: 'Salário' }
+          ];
+        }
+
         // Ensure categorias has default and custom categories merged
         const loadedCats = parsedState.categorias || [];
         const usedCats = [
@@ -599,6 +754,37 @@ export default function App() {
 
   const totalGastosVariaveis = state.gastos
     .reduce((acc, g) => acc + (Number(g.valor) || 0), 0);
+
+  const totalGastosVariaveisCredito = state.gastos
+    .filter(g => (g.formaPagamento || 'credito') === 'credito')
+    .reduce((acc, g) => acc + (Number(g.valor) || 0), 0);
+
+  const totalGastosVariaveisDebito = state.gastos
+    .filter(g => g.formaPagamento === 'debito')
+    .reduce((acc, g) => acc + (Number(g.valor) || 0), 0);
+
+  const countCredito = state.gastos.filter(g => (g.formaPagamento || 'credito') === 'credito').length;
+  const countDebito = state.gastos.filter(g => g.formaPagamento === 'debito').length;
+
+  const pctCredito = totalGastosVariaveis > 0 
+    ? Math.round((totalGastosVariaveisCredito / totalGastosVariaveis) * 100) 
+    : 0;
+  const pctDebito = totalGastosVariaveis > 0 
+    ? Math.round((totalGastosVariaveisDebito / totalGastosVariaveis) * 100) 
+    : 0;
+
+  const gastosFiltrados = state.gastos.filter(g => {
+    if (filtroFormaPagamento === 'todos') return true;
+    const forma = g.formaPagamento || 'credito';
+    return forma === filtroFormaPagamento;
+  });
+
+  // Descritivo do Saldo: Entradas (Salário, Freela, Vendas, etc.)
+  const listaItensSaldo: ItemSaldo[] = (state.itensSaldo && state.itensSaldo.length > 0)
+    ? state.itensSaldo
+    : [{ id: 'sal-base', descricao: 'Salário Base', valor: state.saldoConta, origem: 'Salário' }];
+
+  const totalItensSaldo = listaItensSaldo.reduce((acc, it) => acc + (Number(it.valor) || 0), 0);
 
   // Total do Gasto na Fatura / Mês: Gastos Fixos + Gastos Variáveis + Parcelamentos (parcelas ativas no mês)
   const totalGastoNaFaturaMes = totalGastosFixos + totalGastosVariaveis + totalParcelamentos;
@@ -843,6 +1029,150 @@ export default function App() {
               {formatBRL(saldoLivre)}
             </div>
           )}
+
+          {/* Barra Resumo do Saldo em Conta & Toggle do Descritivo */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 pb-1 border-t border-[#F1F3F4] mt-3">
+            <div className="text-xs text-[#5F6368] flex items-center flex-wrap gap-1.5">
+              <span>Saldo em Conta:</span>
+              <strong className="text-[#202124] font-semibold text-sm">{formatBRL(state.saldoConta)}</strong>
+              <span className="text-[11px] bg-[#E8F0FE] text-[#0B57D0] px-2 py-0.5 rounded-full font-bold border border-[#D2E3FC]">
+                {listaItensSaldo.length} {listaItensSaldo.length === 1 ? 'entrada' : 'entradas'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenAddItemSaldo('Freela')}
+                className="text-xs font-semibold text-[#0B57D0] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                title="Adicionar freela, venda ou outra renda"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Entrada</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDescritivoSaldoExpanded(!isDescritivoSaldoExpanded)}
+                className="text-xs font-semibold text-[#5F6368] hover:text-[#202124] px-2 py-1 rounded-lg hover:bg-[#F1F3F4] transition-colors flex items-center gap-1"
+              >
+                <span>{isDescritivoSaldoExpanded ? 'Ocultar' : 'Descritivo'}</span>
+                {isDescritivoSaldoExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Painel Descritivo do Saldo (Entradas / Freelas / Vendas / Salário) */}
+          {isDescritivoSaldoExpanded && (
+            <div className="mt-3 p-4 bg-[#F8F9FA] rounded-[24px] border border-[#DADCE0] space-y-3 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-[#E8F0FE] flex items-center justify-center text-[#0B57D0] shrink-0">
+                    <Coins className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-[#041E49] uppercase tracking-wider">
+                      Descritivo do Saldo
+                    </h3>
+                    <p className="text-[11px] text-[#5F6368]">
+                      Salário, freelas, vendas e outras rendas do mês
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddItemSaldo('Freela')}
+                  className="bg-[#0B57D0] text-white hover:bg-[#0842A0] px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Nova Entrada</span>
+                </button>
+              </div>
+
+              {/* Lista das Entradas */}
+              <div className="space-y-2 pt-1">
+                {listaItensSaldo.map(item => (
+                  <div 
+                    key={item.id}
+                    className="flex items-center justify-between p-2.5 px-3 bg-white rounded-xl border border-[#E8EAED] hover:border-[#DADCE0] transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                      <div className="shrink-0 p-1.5 rounded-lg bg-[#F8F9FA] border border-[#E8EAED]">
+                        {getOrigemIcon(item.origem)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-medium text-[#202124] truncate">{item.descricao}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${getOrigemBadgeClass(item.origem)} shrink-0`}>
+                            {item.origem || 'Entrada'}
+                          </span>
+                        </div>
+                        {item.data && (
+                          <span className="text-[11px] text-[#5F6368]">{formatDateBR(item.data)}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-bold text-sm text-[#0F9D58] mr-1">
+                        + {formatBRL(item.valor)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditItemSaldo(item)}
+                        className="p-1.5 text-[#5F6368] hover:bg-[#E8F0FE] hover:text-[#0B57D0] rounded-lg transition-colors"
+                        title="Editar entrada"
+                        aria-label="Editar entrada"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItemSaldo(item.id)}
+                        className="p-1.5 text-[#5F6368] hover:bg-[#F9DEDC] hover:text-[#B3261E] rounded-lg transition-colors"
+                        title="Remover entrada"
+                        aria-label="Remover entrada"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Barra de Ações Rápidas e Total */}
+              <div className="pt-2 border-t border-[#E8EAED] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div className="text-[#5F6368]">
+                  Total das entradas: <strong className="text-[#041E49] font-bold">{formatBRL(totalItensSaldo)}</strong>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] text-[#5F6368] mr-0.5">Adicionar:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddItemSaldo('Freela')}
+                    className="px-2 py-1 rounded-lg bg-white border border-[#E9D5FF] text-[#7C3AED] hover:bg-[#F3E8FF] font-semibold transition-colors flex items-center gap-1 text-[11px]"
+                  >
+                    <Laptop className="w-3 h-3" />
+                    + Freela
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddItemSaldo('Vendas')}
+                    className="px-2 py-1 rounded-lg bg-white border border-[#FED7AA] text-[#A0460A] hover:bg-[#FFF8F3] font-semibold transition-colors flex items-center gap-1 text-[11px]"
+                  >
+                    <ShoppingBag className="w-3 h-3" />
+                    + Venda
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddItemSaldo('Outros')}
+                    className="px-2 py-1 rounded-lg bg-white border border-[#DADCE0] text-[#5F6368] hover:bg-[#F1F3F4] font-semibold transition-colors flex items-center gap-1 text-[11px]"
+                  >
+                    <Plus className="w-3 h-3" />
+                    + Outro
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
           {!isEditing && (
             <div className="mt-6 p-4 bg-[#F8F9FA] rounded-[20px] border border-[#E8EAED]">
@@ -850,10 +1180,17 @@ export default function App() {
                 <span className="text-[#5F6368] text-sm">Gasto na Fatura / Mês</span>
                 <span className="font-semibold text-lg text-[#B3261E]">{formatBRL(totalGastoNaFaturaMes)}</span>
               </div>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#5F6368] mb-3">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#5F6368] mb-3">
                 <span className="bg-white px-2 py-0.5 rounded-md border border-[#E8EAED]">Fixos: <strong>{formatBRL(totalGastosFixos)}</strong></span>
                 <span className="bg-white px-2 py-0.5 rounded-md border border-[#E8EAED]">Parcelas: <strong>{formatBRL(totalParcelamentos)}</strong></span>
-                <span className="bg-white px-2 py-0.5 rounded-md border border-[#E8EAED]">Variáveis: <strong>{formatBRL(totalGastosVariaveis)}</strong></span>
+                <span className="bg-white px-2 py-0.5 rounded-md border border-[#E8EAED]">
+                  Variáveis: <strong>{formatBRL(totalGastosVariaveis)}</strong>
+                  {totalGastosVariaveis > 0 && (
+                    <span className="text-[10px] text-[#5F6368] ml-1">
+                      (Crédito: <strong className="text-[#0B57D0]">{formatBRL(totalGastosVariaveisCredito)}</strong> • Débito: <strong className="text-[#0F9D58]">{formatBRL(totalGastosVariaveisDebito)}</strong>)
+                    </span>
+                  )}
+                </span>
               </div>
               <div className="flex justify-between items-center mb-4 pt-2 border-t border-[#E8EAED]">
                 <span className="text-[#5F6368] text-sm">Dias Restantes</span>
@@ -890,24 +1227,33 @@ export default function App() {
               </div>
             ) : (
               <>
-                Saldo base: {formatBRL(state.saldoConta)}.<br/>
+                Saldo base: {formatBRL(state.saldoConta)} ({listaItensSaldo.length} {listaItensSaldo.length === 1 ? 'fonte de entrada' : 'fontes de entrada'}).<br/>
                 Já descontados {formatBRL(totalGastoNaFaturaMes)} de fatura/mês (Fixos: {formatBRL(totalGastosFixos)}, Parcelas: {formatBRL(totalParcelamentos)}, Variáveis: {formatBRL(totalGastosVariaveis)}) e {formatBRL(totalMetaEconomiaAlvo)} de metas de economia.
               </>
             )}
           </div>
         </section>
 
-        {/* Botão Adicionar Gasto Principal */}
-        <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0] text-center">
-          <h2 className="text-lg font-medium mb-1 text-[#202124]">Adicionar Nova Despesa</h2>
-          <p className="text-sm mb-4 text-[#5F6368]">Registre compras variáveis, parcelamentos ou novas contas fixas.</p>
-          <button 
-            onClick={handleOpenAddModal}
-            className="w-full bg-[#0B57D0] text-white py-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#0842A0] transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Adicionar Gasto
-          </button>
+        {/* Botões de Ação Principal: Gastos e Entradas */}
+        <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0]">
+          <h2 className="text-lg font-medium mb-1 text-[#202124]">Movimentações do Mês</h2>
+          <p className="text-sm mb-4 text-[#5F6368]">Registre novas compras ou adicione novas entradas (freelas, vendas, salário).</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button 
+              onClick={handleOpenAddModal}
+              className="w-full bg-[#0B57D0] text-white py-3.5 px-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#0842A0] transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Adicionar Gasto
+            </button>
+            <button 
+              onClick={() => handleOpenAddItemSaldo('Freela')}
+              className="w-full bg-[#0F9D58] text-white py-3.5 px-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#0B8043] transition-colors"
+            >
+              <ArrowDownLeft className="w-5 h-5" />
+              Adicionar Entrada / Freela
+            </button>
+          </div>
         </section>
 
         {/* Meus Tetos (Budgets) & Categorias */}
@@ -1241,6 +1587,98 @@ export default function App() {
             )}
           </div>
 
+          {/* Divisão Débito vs Crédito */}
+          {state.gastos.length > 0 && (
+            <div className="mb-6 p-4 bg-[#F8F9FA] rounded-[24px] border border-[#DADCE0]">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold text-[#5F6368] uppercase tracking-wider flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-[#0B57D0]" />
+                  Divisão Débito vs Crédito
+                </h3>
+                <span className="text-xs text-[#5F6368] font-medium">
+                  {state.gastos.length} despesa(s)
+                </span>
+              </div>
+
+              {/* Cards de Comparação */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                {/* Card Crédito */}
+                <button 
+                  type="button"
+                  onClick={() => setFiltroFormaPagamento(filtroFormaPagamento === 'credito' ? 'todos' : 'credito')}
+                  className={`text-left p-3.5 rounded-2xl border transition-all ${
+                    filtroFormaPagamento === 'credito' 
+                      ? 'bg-[#E8F0FE] border-[#0B57D0] ring-2 ring-[#0B57D0]/20' 
+                      : 'bg-white border-[#E8EAED] hover:border-[#0B57D0]/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-[#0B57D0] flex items-center gap-1.5">
+                      <CreditCard className="w-4 h-4" />
+                      Cartão de Crédito
+                    </span>
+                    <span className="text-xs font-bold text-[#0B57D0] bg-[#E8F0FE] px-2 py-0.5 rounded-full border border-[#D2E3FC]">
+                      {pctCredito}%
+                    </span>
+                  </div>
+                  <p className="text-xl font-bold text-[#041E49]">{formatBRL(totalGastosVariaveisCredito)}</p>
+                  <p className="text-[11px] text-[#5F6368] mt-0.5">{countCredito} compra(s) na fatura</p>
+                </button>
+
+                {/* Card Débito */}
+                <button 
+                  type="button"
+                  onClick={() => setFiltroFormaPagamento(filtroFormaPagamento === 'debito' ? 'todos' : 'debito')}
+                  className={`text-left p-3.5 rounded-2xl border transition-all ${
+                    filtroFormaPagamento === 'debito' 
+                      ? 'bg-[#E6F4EA] border-[#0F9D58] ring-2 ring-[#0F9D58]/20' 
+                      : 'bg-white border-[#E8EAED] hover:border-[#0F9D58]/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-[#0F9D58] flex items-center gap-1.5">
+                      <Banknote className="w-4 h-4" />
+                      Débito / Pix
+                    </span>
+                    <span className="text-xs font-bold text-[#0F9D58] bg-[#E6F4EA] px-2 py-0.5 rounded-full border border-[#CEEAD6]">
+                      {pctDebito}%
+                    </span>
+                  </div>
+                  <p className="text-xl font-bold text-[#041E49]">{formatBRL(totalGastosVariaveisDebito)}</p>
+                  <p className="text-[11px] text-[#5F6368] mt-0.5">{countDebito} compra(s) à vista</p>
+                </button>
+              </div>
+
+              {/* Barra visual de proporção */}
+              {totalGastosVariaveis > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="w-full h-2.5 bg-[#E8EAED] rounded-full overflow-hidden flex">
+                    <div 
+                      style={{ width: `${pctCredito}%` }} 
+                      className="bg-[#0B57D0] h-full transition-all duration-300"
+                      title={`Crédito: ${pctCredito}%`}
+                    />
+                    <div 
+                      style={{ width: `${pctDebito}%` }} 
+                      className="bg-[#0F9D58] h-full transition-all duration-300"
+                      title={`Débito: ${pctDebito}%`}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-[#5F6368]">
+                    <span className="flex items-center gap-1 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-[#0B57D0]" />
+                      Crédito ({pctCredito}%)
+                    </span>
+                    <span className="flex items-center gap-1 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-[#0F9D58]" />
+                      Débito ({pctDebito}%)
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Gráfico de Pizza de Distribuição Percentual */}
           {pieChartData.length > 0 ? (
             <div className="mb-6 p-4 bg-[#F8F9FA] rounded-[24px] border border-[#DADCE0]">
@@ -1310,54 +1748,135 @@ export default function App() {
             <div className="space-y-3 mb-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-xs font-bold text-[#5F6368] uppercase tracking-wider">
-                  Histórico de Gastos ({state.gastos.length})
+                  Histórico de Gastos ({gastosFiltrados.length})
                 </h3>
-                {state.gastos.length > 5 && (
+                {gastosFiltrados.length > 5 && (
                   <button
                     type="button"
                     onClick={() => setShowAllGastos(!showAllGastos)}
                     className="text-xs font-semibold text-[#0B57D0] hover:underline"
                   >
-                    {showAllGastos ? 'Mostrar menos' : `Ver todos (${state.gastos.length})`}
+                    {showAllGastos ? 'Mostrar menos' : `Ver todos (${gastosFiltrados.length})`}
                   </button>
                 )}
               </div>
-              <div className={`space-y-2 ${showAllGastos && state.gastos.length > 6 ? 'max-h-96 overflow-y-auto pr-1' : ''}`}>
-                {(showAllGastos ? state.gastos : state.gastos.slice(0, 5)).map(g => (
-                  <div key={g.id} className="flex justify-between items-center py-2.5 px-3 rounded-xl border border-[#F1F3F4] hover:bg-[#F8F9FA] transition-colors">
-                    <div className="min-w-0 flex-1 mr-3">
-                      <p className="font-medium text-sm text-[#202124] truncate">{g.descricao}</p>
-                      <p className="text-xs text-[#5F6368] flex items-center gap-1.5 mt-0.5">
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(g.categoria) }} />
-                        <span>{g.categoria}</span>
-                        <span>•</span>
-                        <span>{formatDateBR(g.data)}</span>
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="font-semibold text-sm text-[#202124] mr-1">{formatBRL(g.valor)}</span>
-                      <button 
-                        type="button"
-                        onClick={() => handleOpenEditGasto(g)} 
-                        className="p-1.5 text-[#5F6368] hover:bg-[#E8F0FE] hover:text-[#0B57D0] rounded-lg transition-colors"
-                        title="Editar este gasto"
-                        aria-label="Editar este gasto"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => handleRemoveGasto(g.id)} 
-                        className="p-1.5 text-[#5F6368] hover:bg-[#F9DEDC] hover:text-[#B3261E] rounded-lg transition-colors"
-                        title="Excluir este gasto"
-                        aria-label="Excluir este gasto"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+
+              {/* Filtros de Forma de Pagamento */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setFiltroFormaPagamento('todos')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors border shrink-0 ${
+                    filtroFormaPagamento === 'todos'
+                      ? 'bg-[#202124] text-white border-[#202124]'
+                      : 'bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F8F9FA]'
+                  }`}
+                >
+                  Todos ({state.gastos.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroFormaPagamento('credito')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors border flex items-center gap-1.5 shrink-0 ${
+                    filtroFormaPagamento === 'credito'
+                      ? 'bg-[#0B57D0] text-white border-[#0B57D0]'
+                      : 'bg-white text-[#0B57D0] border-[#D2E3FC] hover:bg-[#E8F0FE]'
+                  }`}
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Crédito ({countCredito})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroFormaPagamento('debito')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors border flex items-center gap-1.5 shrink-0 ${
+                    filtroFormaPagamento === 'debito'
+                      ? 'bg-[#0F9D58] text-white border-[#0F9D58]'
+                      : 'bg-white text-[#0F9D58] border-[#CEEAD6] hover:bg-[#E6F4EA]'
+                  }`}
+                >
+                  <Banknote className="w-3.5 h-3.5" />
+                  Débito ({countDebito})
+                </button>
               </div>
+
+              {gastosFiltrados.length === 0 ? (
+                <div className="text-center py-6 bg-[#F8F9FA] rounded-2xl border border-dashed border-[#DADCE0]">
+                  <p className="text-sm text-[#5F6368]">
+                    Nenhum gasto encontrado no {filtroFormaPagamento === 'credito' ? 'Crédito' : 'Débito'}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroFormaPagamento('todos')}
+                    className="mt-2 text-xs font-semibold text-[#0B57D0] hover:underline"
+                  >
+                    Ver todos os gastos
+                  </button>
+                </div>
+              ) : (
+                <div className={`space-y-2 ${showAllGastos && gastosFiltrados.length > 6 ? 'max-h-96 overflow-y-auto pr-1' : ''}`}>
+                  {(showAllGastos ? gastosFiltrados : gastosFiltrados.slice(0, 5)).map(g => {
+                    const isDebito = (g.formaPagamento || 'credito') === 'debito';
+                    return (
+                      <div key={g.id} className="flex justify-between items-center py-2.5 px-3 rounded-xl border border-[#F1F3F4] hover:bg-[#F8F9FA] transition-colors">
+                        <div className="min-w-0 flex-1 mr-3">
+                          <p className="font-medium text-sm text-[#202124] truncate">{g.descricao}</p>
+                          <div className="text-xs text-[#5F6368] flex flex-wrap items-center gap-1.5 mt-0.5">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(g.categoria) }} />
+                            <span>{g.categoria}</span>
+                            <span>•</span>
+                            <span>{formatDateBR(g.data)}</span>
+                            <span>•</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleFormaPagamento(g.id)}
+                              title="Clique para alternar entre Crédito e Débito"
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                                isDebito
+                                  ? 'bg-[#E6F4EA] text-[#0F9D58] border-[#CEEAD6] hover:bg-[#CEEAD6]'
+                                  : 'bg-[#E8F0FE] text-[#0B57D0] border-[#D2E3FC] hover:bg-[#D2E3FC]'
+                              }`}
+                            >
+                              {isDebito ? (
+                                <>
+                                  <Banknote className="w-3 h-3" />
+                                  Débito
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="w-3 h-3" />
+                                  Crédito
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-semibold text-sm text-[#202124] mr-1">{formatBRL(g.valor)}</span>
+                          <button 
+                            type="button"
+                            onClick={() => handleOpenEditGasto(g)} 
+                            className="p-1.5 text-[#5F6368] hover:bg-[#E8F0FE] hover:text-[#0B57D0] rounded-lg transition-colors"
+                            title="Editar este gasto"
+                            aria-label="Editar este gasto"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleRemoveGasto(g.id)} 
+                            className="p-1.5 text-[#5F6368] hover:bg-[#F9DEDC] hover:text-[#B3261E] rounded-lg transition-colors"
+                            title="Excluir este gasto"
+                            aria-label="Excluir este gasto"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1462,6 +1981,54 @@ export default function App() {
                       <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Padaria</span>
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* Forma de Pagamento para Gastos Variáveis */}
+              {(editingGastoId || newExpenseType === 'Variável') && (
+                <div className="p-3.5 bg-[#F8F9FA] rounded-2xl border border-[#DADCE0] animate-in fade-in duration-200">
+                  <label className="block text-xs font-bold text-[#041E49] uppercase tracking-wider mb-2">
+                    Forma de Pagamento
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewExpenseForma('credito')}
+                      className={`py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 transition-all ${
+                        newExpenseForma === 'credito'
+                          ? 'border-[#0B57D0] bg-[#E8F0FE] text-[#0B57D0] font-bold shadow-xs ring-1 ring-[#0B57D0]'
+                          : 'border-[#DADCE0] bg-white text-[#5F6368] hover:bg-[#F1F3F4]'
+                      }`}
+                    >
+                      <CreditCard className="w-4 h-4 text-[#0B57D0]" />
+                      <span className="text-xs sm:text-sm">Cartão de Crédito</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewExpenseForma('debito')}
+                      className={`py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 transition-all ${
+                        newExpenseForma === 'debito'
+                          ? 'border-[#0F9D58] bg-[#E6F4EA] text-[#0F9D58] font-bold shadow-xs ring-1 ring-[#0F9D58]'
+                          : 'border-[#DADCE0] bg-white text-[#5F6368] hover:bg-[#F1F3F4]'
+                      }`}
+                    >
+                      <Banknote className="w-4 h-4 text-[#0F9D58]" />
+                      <span className="text-xs sm:text-sm">Débito / Pix</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#5F6368] mt-2 flex items-center gap-1">
+                    {newExpenseForma === 'credito' ? (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#0B57D0] shrink-0" />
+                        <span>Compra lançada na <strong>fatura do cartão</strong>.</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#0F9D58] shrink-0" />
+                        <span>Saiu direto do <strong>saldo da conta</strong> (Débito ou Pix).</span>
+                      </>
+                    )}
+                  </p>
                 </div>
               )}
 
@@ -2008,6 +2575,127 @@ export default function App() {
                   className="flex-1 bg-[#0B57D0] text-white py-3.5 rounded-xl font-bold text-sm hover:bg-[#0842A0] transition-colors shadow-sm"
                 >
                   Salvar Meta
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nova / Editar Entrada de Saldo (Descritivo) */}
+      {isItemSaldoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xl font-bold text-[#041E49] flex items-center gap-2">
+                <Coins className="w-5 h-5 text-[#0F9D58]" />
+                {editingItemSaldoId ? 'Editar Entrada de Saldo' : 'Nova Entrada de Saldo'}
+              </h2>
+              <button 
+                onClick={() => setIsItemSaldoModalOpen(false)} 
+                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors"
+                title="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveItemSaldo} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#041E49] mb-1.5 uppercase tracking-wide">
+                  Origem do Recebimento
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {ORIGENS_ENTRADA.map(origem => {
+                    const isSelected = itemSaldoOrigem === origem;
+                    return (
+                      <button
+                        key={origem}
+                        type="button"
+                        onClick={() => {
+                          setItemSaldoOrigem(origem);
+                          if (!itemSaldoDescricao || ORIGENS_ENTRADA.includes(itemSaldoDescricao)) {
+                            setItemSaldoDescricao(origem === 'Salário' ? 'Salário Mensal' : origem);
+                          }
+                        }}
+                        className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold border transition-all ${
+                          isSelected 
+                            ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-sm' 
+                            : 'bg-[#F8F9FA] text-[#5F6368] border-[#DADCE0] hover:bg-[#E8EAED]'
+                        }`}
+                      >
+                        {getOrigemIcon(origem)}
+                        <span>{origem}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#041E49] mb-1.5 uppercase tracking-wide">
+                  Descrição / Identificação
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={itemSaldoDescricao}
+                  onChange={e => setItemSaldoDescricao(e.target.value)}
+                  placeholder="Ex: Freela Landing Page, Venda Teclado, Bônus..."
+                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#041E49] mb-1.5 uppercase tracking-wide">
+                    Valor Recebido (R$)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    required
+                    value={itemSaldoValor}
+                    onChange={e => setItemSaldoValor(e.target.value)}
+                    placeholder="Ex: 850,00"
+                    className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white text-sm font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#041E49] mb-1.5 uppercase tracking-wide">
+                    Data do Recebimento
+                  </label>
+                  <input
+                    type="date"
+                    value={itemSaldoData}
+                    onChange={e => setItemSaldoData(e.target.value)}
+                    className="w-full border border-[#DADCE0] rounded-xl px-3 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-[#E6F4EA] rounded-xl border border-[#CEEAD6] text-xs text-[#137333] flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-[#0F9D58]" />
+                <span>
+                  O valor será somado ao seu Saldo em Conta e aumentará seu Saldo Livre e limite diário.
+                </span>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsItemSaldoModalOpen(false)}
+                  className="flex-1 bg-[#F1F3F4] text-[#202124] py-3.5 rounded-xl font-medium text-sm hover:bg-[#E8EAED] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#0F9D58] text-white py-3.5 rounded-xl font-bold text-sm hover:bg-[#0B8043] transition-colors shadow-sm"
+                >
+                  {editingItemSaldoId ? 'Salvar Alterações' : 'Adicionar ao Saldo'}
                 </button>
               </div>
             </form>
