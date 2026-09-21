@@ -13,6 +13,10 @@ export interface Conta {
   valor: number;
   diaVencimento: number;
   grupo?: string;
+  categoria?: string;
+  parcelaAtual?: number;
+  parcelasTotal?: number;
+  valorTotal?: number;
 }
 
 export interface Teto {

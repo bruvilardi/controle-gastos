@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, Banknote, PieChart as PieChartIcon, TrendingUp, Coins, Tag, FolderPlus, Settings2, Download, Briefcase, Laptop, ShoppingBag, ChevronDown, ChevronUp, ArrowDownLeft } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { AppState, Conta, Gasto, Teto, MetaEconomia, ItemSaldo } from './types';
@@ -99,21 +99,21 @@ const INITIAL_STATE: AppState = {
   ],
   mesAtual: new Date().toISOString().substring(0, 7),
   contas: [
-    { id: 'f1', nome: 'Boleto Partner Instituição', valor: 510.50, diaVencimento: 5, grupo: 'Gastos Fixos' },
-    { id: 'f2', nome: 'Neoenergia (Luz)', valor: 307.43, diaVencimento: 10, grupo: 'Gastos Fixos' },
-    { id: 'f3', nome: 'Telefônica (Internet)', valor: 156.60, diaVencimento: 10, grupo: 'Gastos Fixos' },
-    { id: 'f4', nome: 'DAS / Receita Federal', valor: 86.05, diaVencimento: 20, grupo: 'Gastos Fixos' },
-    { id: 'f5', nome: 'Claro Celular', valor: 49.91, diaVencimento: 15, grupo: 'Gastos Fixos' },
-    { id: 'f6', nome: 'Seguro Cartão Itaú', valor: 9.90, diaVencimento: 10, grupo: 'Gastos Fixos' },
+    { id: 'f1', nome: 'Boleto Partner Instituição', valor: 510.50, diaVencimento: 5, grupo: 'Gastos Fixos', categoria: 'Educação' },
+    { id: 'f2', nome: 'Neoenergia (Luz)', valor: 307.43, diaVencimento: 10, grupo: 'Gastos Fixos', categoria: 'Moradia' },
+    { id: 'f3', nome: 'Telefônica (Internet)', valor: 156.60, diaVencimento: 10, grupo: 'Gastos Fixos', categoria: 'Moradia' },
+    { id: 'f4', nome: 'DAS / Receita Federal', valor: 86.05, diaVencimento: 20, grupo: 'Gastos Fixos', categoria: 'Outros' },
+    { id: 'f5', nome: 'Claro Celular', valor: 49.91, diaVencimento: 15, grupo: 'Gastos Fixos', categoria: 'Outros' },
+    { id: 'f6', nome: 'Seguro Cartão Itaú', valor: 9.90, diaVencimento: 10, grupo: 'Gastos Fixos', categoria: 'Outros' },
     
-    { id: 'c1', nome: 'Google One', valor: 119.98, diaVencimento: 12, grupo: 'Gastos Fixos' },
-    { id: 'c3', nome: 'Apple.com/Bill (1)', valor: 42.90, diaVencimento: 12, grupo: 'Gastos Fixos' },
-    { id: 'c5', nome: 'HBO Max', valor: 22.45, diaVencimento: 12, grupo: 'Gastos Fixos' },
-    { id: 'c8', nome: 'iFood Club', valor: 12.90, diaVencimento: 12, grupo: 'Gastos Fixos' },
+    { id: 'c1', nome: 'Google One', valor: 119.98, diaVencimento: 12, grupo: 'Gastos Fixos', categoria: 'Assinaturas' },
+    { id: 'c3', nome: 'Apple.com/Bill (1)', valor: 42.90, diaVencimento: 12, grupo: 'Gastos Fixos', categoria: 'Assinaturas' },
+    { id: 'c5', nome: 'HBO Max', valor: 22.45, diaVencimento: 12, grupo: 'Gastos Fixos', categoria: 'Assinaturas' },
+    { id: 'c8', nome: 'iFood Club', valor: 12.90, diaVencimento: 12, grupo: 'Gastos Fixos', categoria: 'Delivery' },
     
-    { id: 'p1', nome: 'Academia Vasco (06/12)', valor: 253.49, diaVencimento: 12, grupo: 'Parcelamentos' },
-    { id: 'p2', nome: 'Nuv Fanatiksao (01/08)', valor: 162.37, diaVencimento: 12, grupo: 'Parcelamentos' },
-    { id: 'p3', nome: 'Globo Globoplay (07/12)', valor: 22.90, diaVencimento: 12, grupo: 'Parcelamentos' },
+    { id: 'p1', nome: 'Academia Vasco (06/12)', valor: 253.49, diaVencimento: 12, grupo: 'Parcelamentos', categoria: 'Saúde', parcelaAtual: 6, parcelasTotal: 12 },
+    { id: 'p2', nome: 'Nuv Fanatiksao (01/08)', valor: 162.37, diaVencimento: 12, grupo: 'Parcelamentos', categoria: 'Outros', parcelaAtual: 1, parcelasTotal: 8 },
+    { id: 'p3', nome: 'Globo Globoplay (07/12)', valor: 22.90, diaVencimento: 12, grupo: 'Parcelamentos', categoria: 'Assinaturas', parcelaAtual: 7, parcelasTotal: 12 },
   ],
   tetos: [
     { id: 't1', categoria: 'Discos', limite: 800 },
@@ -181,6 +181,7 @@ export default function App() {
   const [isCategoryManual, setIsCategoryManual] = useState(false);
   const [newExpenseForma, setNewExpenseForma] = useState<'credito' | 'debito'>('credito');
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
+  const [editingContaId, setEditingContaId] = useState<string | null>(null);
   const [filtroFormaPagamento, setFiltroFormaPagamento] = useState<'todos' | 'credito' | 'debito'>('todos');
   const [showAllGastos, setShowAllGastos] = useState(false);
 
@@ -448,12 +449,12 @@ export default function App() {
     if (n.includes('delivery') || n.includes('ifood') || n.includes('rappi') || n.includes('lanche')) return 'Delivery';
     if (n.includes('mercado') || n.includes('supermercado') || n.includes('assai') || n.includes('atacadão') || n.includes('feira') || n.includes('compras') || n.includes('sacolão') || n.includes('hortifruti')) return 'Mercado';
     if (n.includes('restaurante') || n.includes('almoço') || n.includes('almoco') || n.includes('jantar') || n.includes('café') || n.includes('cafe') || n.includes('padaria') || n.includes('pizza') || n.includes('hambúrguer') || n.includes('bar ') || n.includes('churrasco') || n.includes('comida') || n.includes('marmita') || n.includes('esfiha') || n.includes('sushi') || n.includes('alimentação') || n.includes('alimentacao')) return 'Alimentação';
-    if (n.includes('farmácia') || n.includes('farmacia') || n.includes('droga') || n.includes('médico') || n.includes('medico') || n.includes('saúde') || n.includes('saude') || n.includes('remedio') || n.includes('remédio') || n.includes('exame') || n.includes('dentista') || n.includes('hospital') || n.includes('consulta') || n.includes('óptica') || n.includes('optica')) return 'Saúde';
+    if (n.includes('farmácia') || n.includes('farmacia') || n.includes('droga') || n.includes('médico') || n.includes('medico') || n.includes('saúde') || n.includes('saude') || n.includes('remedio') || n.includes('remédio') || n.includes('exame') || n.includes('dentista') || n.includes('hospital') || n.includes('consulta') || n.includes('óptica') || n.includes('optica') || n.includes('academia') || n.includes('ginástica') || n.includes('ginastica') || n.includes('musculação') || n.includes('musculacao') || n.includes('crossfit') || n.includes('pilates')) return 'Saúde';
     if (n.includes('posto') || n.includes('gasolina') || n.includes('combustível') || n.includes('combustivel') || n.includes('etanol') || n.includes('ônibus') || n.includes('onibus') || n.includes('metro') || n.includes('metrô') || n.includes('passagem') || n.includes('pedágio') || n.includes('estacionamento') || n.includes('transporte') || n.includes('bilhete')) return 'Transporte';
     if (n.includes('aluguel') || n.includes('condomínio') || n.includes('condominio') || n.includes('iptu') || n.includes('luz') || n.includes('água') || n.includes('agua') || n.includes('gás') || n.includes('gas') || n.includes('moradia') || n.includes('reforma') || n.includes('móveis') || n.includes('moveis') || n.includes('casa') || n.includes('leroy')) return 'Moradia';
-    if (n.includes('curso') || n.includes('faculdade') || n.includes('escola') || n.includes('livro') || n.includes('udemy') || n.includes('educação') || n.includes('educacao') || n.includes('mensalidade') || n.includes('estudo')) return 'Educação';
+    if (n.includes('curso') || n.includes('faculdade') || n.includes('escola') || n.includes('livro') || n.includes('udemy') || n.includes('educação') || n.includes('educacao') || n.includes('mensalidade') || n.includes('estudo') || n.includes('partner')) return 'Educação';
     if (n.includes('roupa') || n.includes('calçado') || n.includes('calcado') || n.includes('tenis') || n.includes('tênis') || n.includes('sapato') || n.includes('vestuário') || n.includes('vestuario') || n.includes('camisa') || n.includes('calça') || n.includes('zara') || n.includes('renner') || n.includes('c&a')) return 'Vestuário';
-    if (n.includes('netflix') || n.includes('spotify') || n.includes('amazon') || n.includes('prime') || n.includes('disney') || n.includes('hbo') || n.includes('youtube') || n.includes('assinatura') || n.includes('software') || n.includes('streaming') || n.includes('apple') || n.includes('icloud') || n.includes('openai') || n.includes('chatgpt')) return 'Assinaturas';
+    if (n.includes('netflix') || n.includes('spotify') || n.includes('amazon') || n.includes('prime') || n.includes('disney') || n.includes('hbo') || n.includes('youtube') || n.includes('assinatura') || n.includes('software') || n.includes('streaming') || n.includes('apple') || n.includes('icloud') || n.includes('openai') || n.includes('chatgpt') || n.includes('globoplay') || n.includes('globo')) return 'Assinaturas';
     if (n.includes('barbearia') || n.includes('cabelo') || n.includes('salão') || n.includes('salao') || n.includes('manicure') || n.includes('cosmético') || n.includes('perfume') || n.includes('beleza') || n.includes('cuidados') || n.includes('depilação') || n.includes('estética') || n.includes('estetica') || n.includes('skincare')) return 'Cuidados Pessoais';
     if (n.includes('pet') || n.includes('veterinário') || n.includes('veterinario') || n.includes('ração') || n.includes('racao') || n.includes('cachorro') || n.includes('gato') || n.includes('petshop') || n.includes('cobasi') || n.includes('petz')) return 'Pet';
     if (n.includes('viagem') || n.includes('hotel') || n.includes('pousada') || n.includes('airbnb') || n.includes('passagens') || n.includes('voo') || n.includes('mala') || n.includes('turismo') || n.includes('booking')) return 'Viagem';
@@ -461,12 +462,13 @@ export default function App() {
     return 'Outros';
   };
 
-  const handleOpenAddModal = () => {
+  const handleOpenAddModal = (defaultType: 'Fixo' | 'Parcela' | 'Variável' = 'Variável') => {
     setEditingGastoId(null);
+    setEditingContaId(null);
     setNewExpenseName('');
     setNewExpenseValue('');
     setNewExpenseDate(getTodayLocal());
-    setNewExpenseType('Variável');
+    setNewExpenseType(defaultType);
     setParcelasTotal(10);
     setParcelaAtual(1);
     setTipoValorParcela('parcela');
@@ -479,6 +481,7 @@ export default function App() {
   };
 
   const handleOpenEditGasto = (gasto: Gasto) => {
+    setEditingContaId(null);
     setEditingGastoId(gasto.id);
     setNewExpenseName(gasto.descricao);
     setNewExpenseValue(gasto.valor ? gasto.valor.toFixed(2).replace('.', ',') : '');
@@ -487,6 +490,43 @@ export default function App() {
     setNewExpenseCategory(gasto.categoria || 'Outros');
     setIsCategoryManual(true);
     setNewExpenseForma(gasto.formaPagamento || 'credito');
+    setIsInlineAddingCategory(false);
+    setInlineCategoryInput('');
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenEditConta = (conta: Conta) => {
+    setEditingGastoId(null);
+    setEditingContaId(conta.id);
+
+    // Se for parcela, extrai o nome base e as parcelas
+    const matchParcela = conta.nome.match(/^(.*?)\s*\((\d+)[\/de\s]+(\d+)\)$/i);
+    if (matchParcela && conta.grupo === 'Parcelamentos') {
+      setNewExpenseName(matchParcela[1].trim());
+      setParcelaAtual(Number(matchParcela[2]) || 1);
+      setParcelasTotal(Number(matchParcela[3]) || 10);
+    } else {
+      setNewExpenseName(conta.nome);
+      setParcelaAtual(conta.parcelaAtual || 1);
+      setParcelasTotal(conta.parcelasTotal || 10);
+    }
+
+    setNewExpenseValue(conta.valor ? conta.valor.toFixed(2).replace('.', ',') : '');
+
+    // Formata a data com o dia de vencimento
+    const diaNum = Math.max(1, Math.min(31, Number(conta.diaVencimento) || 1));
+    const now = new Date();
+    const yearMonth = state.mesAtual || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    setNewExpenseDate(`${yearMonth}-${String(diaNum).padStart(2, '0')}`);
+
+    setNewExpenseType(conta.grupo === 'Parcelamentos' ? 'Parcela' : 'Fixo');
+    setTipoValorParcela('parcela');
+
+    const activeCats = state.categorias || DEFAULT_CATEGORIES;
+    const cat = conta.categoria || getCategoryFromName(conta.nome, activeCats) || 'Outros';
+    setNewExpenseCategory(cat);
+    setIsCategoryManual(true);
+    setNewExpenseForma('credito');
     setIsInlineAddingCategory(false);
     setInlineCategoryInput('');
     setIsAddModalOpen(true);
@@ -520,18 +560,116 @@ export default function App() {
       ? newExpenseCategory 
       : (getCategoryFromName(newExpenseName, activeCats) || 'Outros');
 
-    if (editingGastoId) {
-      setState(prev => ({
-        ...prev,
-        gastos: prev.gastos.map(g => g.id === editingGastoId ? {
-          ...g,
-          descricao: newExpenseName.trim(),
-          valor: val,
-          data: finalDate,
-          categoria: finalCat,
-          formaPagamento: newExpenseForma
-        } : g)
-      }));
+    if (editingContaId) {
+      const dia = Number(finalDate.split('-')[2]) || new Date().getDate();
+
+      if (newExpenseType === 'Parcela') {
+        const totalP = Math.max(1, Math.min(99, Number(parcelasTotal) || 1));
+        const atualP = Math.max(1, Math.min(totalP, Number(parcelaAtual) || 1));
+        const valorFinal = tipoValorParcela === 'total'
+          ? Number((val / totalP).toFixed(2))
+          : val;
+
+        const cleanName = newExpenseName.replace(/\s*\(\d+[\/de\s]+\d+\)/i, '').trim();
+        const nomeFormatado = `${cleanName} (${String(atualP).padStart(2, '0')}/${String(totalP).padStart(2, '0')})`;
+
+        setState(prev => ({
+          ...prev,
+          contas: prev.contas.map(c => c.id === editingContaId ? {
+            ...c,
+            nome: nomeFormatado,
+            valor: valorFinal,
+            diaVencimento: dia,
+            grupo: 'Parcelamentos' as const,
+            categoria: finalCat,
+            parcelaAtual: atualP,
+            parcelasTotal: totalP,
+            valorTotal: tipoValorParcela === 'total' ? val : valorFinal * totalP
+          } : c)
+        }));
+      } else if (newExpenseType === 'Fixo') {
+        setState(prev => ({
+          ...prev,
+          contas: prev.contas.map(c => c.id === editingContaId ? {
+            ...c,
+            nome: newExpenseName.trim(),
+            valor: val,
+            diaVencimento: dia,
+            grupo: 'Gastos Fixos' as const,
+            categoria: finalCat,
+            parcelaAtual: undefined,
+            parcelasTotal: undefined,
+            valorTotal: undefined
+          } : c)
+        }));
+      } else {
+        // Usuário converteu de Conta para Gasto Variável
+        setState(prev => ({
+          ...prev,
+          contas: prev.contas.filter(c => c.id !== editingContaId),
+          gastos: [{
+            id: editingContaId,
+            descricao: newExpenseName.trim(),
+            valor: val,
+            data: finalDate,
+            categoria: finalCat,
+            formaPagamento: newExpenseForma
+          }, ...prev.gastos]
+        }));
+      }
+    } else if (editingGastoId) {
+      if (newExpenseType === 'Variável') {
+        setState(prev => ({
+          ...prev,
+          gastos: prev.gastos.map(g => g.id === editingGastoId ? {
+            ...g,
+            descricao: newExpenseName.trim(),
+            valor: val,
+            data: finalDate,
+            categoria: finalCat,
+            formaPagamento: newExpenseForma
+          } : g)
+        }));
+      } else if (newExpenseType === 'Parcela') {
+        const dia = Number(finalDate.split('-')[2]) || new Date().getDate();
+        const totalP = Math.max(1, Math.min(99, Number(parcelasTotal) || 1));
+        const atualP = Math.max(1, Math.min(totalP, Number(parcelaAtual) || 1));
+        const valorFinal = tipoValorParcela === 'total'
+          ? Number((val / totalP).toFixed(2))
+          : val;
+        const cleanName = newExpenseName.replace(/\s*\(\d+[\/de\s]+\d+\)/i, '').trim();
+        const nomeFormatado = `${cleanName} (${String(atualP).padStart(2, '0')}/${String(totalP).padStart(2, '0')})`;
+
+        setState(prev => ({
+          ...prev,
+          gastos: prev.gastos.filter(g => g.id !== editingGastoId),
+          contas: [...prev.contas, {
+            id: editingGastoId,
+            nome: nomeFormatado,
+            valor: valorFinal,
+            diaVencimento: dia,
+            grupo: 'Parcelamentos' as const,
+            categoria: finalCat,
+            parcelaAtual: atualP,
+            parcelasTotal: totalP,
+            valorTotal: tipoValorParcela === 'total' ? val : valorFinal * totalP
+          }]
+        }));
+      } else {
+        const dia = Number(finalDate.split('-')[2]) || new Date().getDate();
+        setState(prev => ({
+          ...prev,
+          gastos: prev.gastos.filter(g => g.id !== editingGastoId),
+          contas: [...prev.contas, {
+            id: editingGastoId,
+            nome: newExpenseName.trim(),
+            valor: val,
+            diaVencimento: dia,
+            grupo: 'Gastos Fixos' as const,
+            categoria: finalCat
+          }]
+        }));
+      }
     } else if (newExpenseType === 'Variável') {
       setState(prev => ({
         ...prev,
@@ -562,7 +700,11 @@ export default function App() {
           nome: nomeFormatado,
           valor: valorFinal,
           diaVencimento: dia,
-          grupo: 'Parcelamentos'
+          grupo: 'Parcelamentos' as const,
+          categoria: finalCat,
+          parcelaAtual: atualP,
+          parcelasTotal: totalP,
+          valorTotal: tipoValorParcela === 'total' ? val : valorFinal * totalP
         }]
       }));
     } else {
@@ -574,13 +716,15 @@ export default function App() {
           nome: newExpenseName.trim(),
           valor: val,
           diaVencimento: dia,
-          grupo: 'Gastos Fixos'
+          grupo: 'Gastos Fixos' as const,
+          categoria: finalCat
         }]
       }));
     }
     
     setIsAddModalOpen(false);
     setEditingGastoId(null);
+    setEditingContaId(null);
     setNewExpenseName('');
     setNewExpenseValue('');
     setNewExpenseDate(getTodayLocal());
@@ -694,6 +838,13 @@ export default function App() {
           });
         };
 
+        if (parsedState.contas) {
+          parsedState.contas = parsedState.contas.map(c => ({
+            ...c,
+            categoria: c.categoria || getCategoryFromName(c.nome, allUniqueCats) || 'Outros'
+          }));
+        }
+
         if (parsedState.mesAtual !== currentMonth) {
           parsedState = {
             ...parsedState,
@@ -797,20 +948,59 @@ export default function App() {
   const diasRestantes = Math.max(1, totalDiasMes - diaAtual + 1); // Include today
   const limiteDiario = Math.max(0, saldoLivre / diasRestantes);
 
-  const gastosPorCategoria = state.gastos.reduce((acc, g) => {
-    const val = Number(g.valor) || 0;
-    acc[g.categoria] = (acc[g.categoria] || 0) + val;
-    return acc;
-  }, {} as Record<string, number>);
+  const getContaCategory = (c: Conta) => {
+    return c.categoria || getCategoryFromName(c.nome, state.categorias || DEFAULT_CATEGORIES) || 'Outros';
+  };
 
-  const pieChartData = (Object.entries(gastosPorCategoria) as [string, number][])
-    .filter(([_, valor]) => valor > 0)
-    .map(([categoria, valor]) => ({
-      name: categoria,
-      value: valor,
-      percentage: totalGastosVariaveis > 0 ? ((valor / totalGastosVariaveis) * 100).toFixed(1) : '0',
-    }))
-    .sort((a, b) => b.value - a.value);
+  // Montante de gastos mensais discriminado por categoria:
+  // Combina Gastos Variáveis + Gastos Fixos + Parcelamentos (valor da parcela ativa no mês)
+  const breakdownPorCategoria = useMemo(() => {
+    const map: Record<string, { total: number; variaveis: number; fixos: number; parcelas: number }> = {};
+
+    // 1. Gastos Variáveis
+    (state.gastos || []).forEach(g => {
+      const cat = g.categoria || 'Outros';
+      const val = Number(g.valor) || 0;
+      if (!map[cat]) map[cat] = { total: 0, variaveis: 0, fixos: 0, parcelas: 0 };
+      map[cat].total += val;
+      map[cat].variaveis += val;
+    });
+
+    // 2. Gastos Fixos e Parcelamentos (contas do mês)
+    (state.contas || []).forEach(c => {
+      const cat = getContaCategory(c);
+      const val = Number(c.valor) || 0;
+      if (!map[cat]) map[cat] = { total: 0, variaveis: 0, fixos: 0, parcelas: 0 };
+      map[cat].total += val;
+      if (c.grupo === 'Parcelamentos') {
+        map[cat].parcelas += val;
+      } else {
+        map[cat].fixos += val;
+      }
+    });
+
+    return map;
+  }, [state.gastos, state.contas, state.categorias]);
+
+  const gastosPorCategoria: Record<string, number> = useMemo(() => {
+    const res: Record<string, number> = {};
+    (Object.entries(breakdownPorCategoria) as [string, { total: number; variaveis: number; fixos: number; parcelas: number }][]).forEach(([cat, data]) => {
+      res[cat] = data.total;
+    });
+    return res;
+  }, [breakdownPorCategoria]);
+
+  const pieChartData = useMemo(() => {
+    return (Object.entries(breakdownPorCategoria) as [string, { total: number; variaveis: number; fixos: number; parcelas: number }][])
+      .filter(([_, data]) => data.total > 0)
+      .map(([categoria, data]) => ({
+        name: categoria,
+        value: data.total,
+        breakdown: data,
+        percentage: totalGastoNaFaturaMes > 0 ? ((data.total / totalGastoNaFaturaMes) * 100).toFixed(1) : '0',
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [breakdownPorCategoria, totalGastoNaFaturaMes]);
 
   const handleResetGastos = () => {
     setConfirmDialog({
@@ -827,7 +1017,7 @@ export default function App() {
   const formatBRL = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
-  const handleUpdateConta = (id: string, field: 'nome' | 'valor', value: string | number) => {
+  const handleUpdateConta = (id: string, field: 'nome' | 'valor' | 'categoria' | 'diaVencimento', value: string | number) => {
     setState(prev => ({
       ...prev,
       contas: prev.contas.map(c => c.id === id ? { ...c, [field]: value } : c)
@@ -988,7 +1178,17 @@ export default function App() {
                     if (e.key === 'Enter') {
                       const val = parseCurrency(tempSaldoInput);
                       if (!isNaN(val)) {
-                        setState(prev => ({ ...prev, saldoConta: val }));
+                        setState(prev => {
+                          const itens = prev.itensSaldo || [];
+                          if (itens.length <= 1) {
+                            return {
+                              ...prev,
+                              saldoConta: val,
+                              itensSaldo: [{ id: itens[0]?.id || 'sal-1', descricao: itens[0]?.descricao || 'Salário Mensal', valor: val, origem: itens[0]?.origem || 'Salário' }]
+                            };
+                          }
+                          return { ...prev, saldoConta: val };
+                        });
                       }
                       setIsEditingSaldo(false);
                     } else if (e.key === 'Escape') {
@@ -1003,7 +1203,17 @@ export default function App() {
                   onClick={() => {
                     const val = parseCurrency(tempSaldoInput);
                     if (!isNaN(val)) {
-                      setState(prev => ({ ...prev, saldoConta: val }));
+                      setState(prev => {
+                        const itens = prev.itensSaldo || [];
+                        if (itens.length <= 1) {
+                          return {
+                            ...prev,
+                            saldoConta: val,
+                            itensSaldo: [{ id: itens[0]?.id || 'sal-1', descricao: itens[0]?.descricao || 'Salário Mensal', valor: val, origem: itens[0]?.origem || 'Salário' }]
+                          };
+                        }
+                        return { ...prev, saldoConta: val };
+                      });
                     }
                     setIsEditingSaldo(false);
                   }}
@@ -1502,12 +1712,40 @@ export default function App() {
           )}
         </section>
 
-        {/* Contas a Pagar */}
+        {/* Contas a Pagar (Fixos & Parcelados) */}
         <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0]">
-          <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-[#0B57D0]" />
-            Contas do Mês
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <h2 className="text-lg font-medium flex items-center gap-2 text-[#202124]">
+                <Calendar className="w-5 h-5 text-[#0B57D0]" />
+                Contas do Mês (Fixos & Parcelados)
+              </h2>
+              <p className="text-xs text-[#5F6368] mt-0.5">
+                Total agendado no mês: <strong className="text-[#0B57D0]">{formatBRL(totalContas)}</strong>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenAddModal('Fixo')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#E8F0FE] text-[#0B57D0] hover:bg-[#D2E3FC] rounded-full text-xs font-semibold transition-colors shadow-2xs"
+                title="Adicionar gasto fixo (aluguel, internet, etc.)"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Gasto Fixo
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenAddModal('Parcela')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFF8F3] text-[#A0460A] border border-[#FED7AA] hover:bg-[#FEEAD9] rounded-full text-xs font-semibold transition-colors shadow-2xs"
+                title="Adicionar compra parcelada"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Gasto Parcelado
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-8">
             {['Gastos Fixos', 'Parcelamentos'].map(grupoNome => {
               const contasGrupo = state.contas
@@ -1519,35 +1757,76 @@ export default function App() {
 
               return (
                 <div key={grupoNome} className="space-y-3">
-                  <div className="flex justify-between items-end px-2 border-b border-[#E8EAED] pb-2 mb-4">
-                    <h3 className="font-medium text-[#202124]">{grupoNome}</h3>
+                  <div className="flex justify-between items-end px-2 border-b border-[#E8EAED] pb-2 mb-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-[#202124]">{grupoNome}</h3>
+                      <span className="text-xs text-[#5F6368] bg-[#F1F3F4] px-2 py-0.5 rounded-full font-medium">
+                        {contasGrupo.length} {contasGrupo.length === 1 ? 'item' : 'itens'}
+                      </span>
+                    </div>
                     <div className="text-right">
                       <span className="font-medium text-[#202124]">{formatBRL(totalGrupo)}</span>
                     </div>
                   </div>
                   {contasGrupo.map(conta => {
+                    const contaCat = getContaCategory(conta);
+                    const catColor = getCategoryColor(contaCat);
+
                     return (
-                      <div key={conta.id} className="p-4 rounded-[16px] flex items-center justify-between transition-colors bg-[#F8F9FA] border border-[#DADCE0]">
-                        <div className="flex-1 mr-4">
-                          <h4 className="font-medium text-[15px] flex items-center gap-2">
+                      <div key={conta.id} className="p-4 rounded-[16px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors bg-[#F8F9FA] border border-[#DADCE0] hover:border-[#BDC1C6]">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-medium text-[15px] text-[#202124] truncate">
+                              {isEditing ? (
+                                <input 
+                                  type="text" 
+                                  value={conta.nome} 
+                                  onChange={e => handleUpdateConta(conta.id, 'nome', e.target.value)} 
+                                  className="border border-[#DADCE0] rounded px-2 py-1 w-full bg-white text-[15px]" 
+                                />
+                              ) : (
+                                conta.nome
+                              )}
+                            </h4>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap text-xs text-[#5F6368] mt-1.5">
+                            {/* Categoria Tag */}
                             {isEditing ? (
-                              <input 
-                                type="text" 
-                                value={conta.nome} 
-                                onChange={e => handleUpdateConta(conta.id, 'nome', e.target.value)} 
-                                className="border border-[#DADCE0] rounded px-2 py-1 w-full bg-white text-[15px]" 
-                              />
+                              <select
+                                value={contaCat}
+                                onChange={e => handleUpdateConta(conta.id, 'categoria', e.target.value)}
+                                className="border border-[#DADCE0] rounded px-2 py-0.5 text-xs bg-white text-[#202124]"
+                              >
+                                {(state.categorias || DEFAULT_CATEGORIES).map(cat => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                              </select>
                             ) : (
-                              conta.nome
+                              <span 
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-white shadow-2xs"
+                                style={{ borderColor: catColor + '40', color: '#202124' }}
+                              >
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
+                                {contaCat}
+                              </span>
                             )}
-                          </h4>
-                          {!isEditing && (
-                            <p className="text-xs mt-0.5 opacity-90">
-                              Vence dia {conta.diaVencimento} 
-                            </p>
-                          )}
+
+                            <span>•</span>
+                            <span>Vence dia {conta.diaVencimento}</span>
+
+                            {conta.grupo === 'Parcelamentos' && (
+                              <>
+                                <span>•</span>
+                                <span className="text-[#0B57D0] font-semibold bg-[#E8F0FE] px-2 py-0.5 rounded-md text-[10px]">
+                                  Parcela ativa
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right flex flex-col items-end">
+
+                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
                           {isEditing ? (
                             <div className="flex items-center gap-2">
                               <input 
@@ -1556,13 +1835,32 @@ export default function App() {
                                 onChange={e => handleUpdateConta(conta.id, 'valor', Number(e.target.value))} 
                                 className="border border-[#DADCE0] rounded px-2 py-1 w-24 text-right bg-white font-medium text-[15px]" 
                               />
-                              <button onClick={() => handleRemoveConta(conta.id)} className="p-1.5 bg-[#F9DEDC] text-[#B3261E] rounded-md hover:bg-[#F2B8B5] transition-colors">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
                             </div>
                           ) : (
-                            <div className="font-medium text-[15px]">{formatBRL(conta.valor)}</div>
+                            <div className="text-right">
+                              <div className="font-semibold text-[15px] text-[#202124]">{formatBRL(conta.valor)}</div>
+                              <span className="text-[10px] text-[#5F6368]">no mês</span>
+                            </div>
                           )}
+
+                          <div className="flex items-center gap-1">
+                            <button 
+                              type="button"
+                              onClick={() => handleOpenEditConta(conta)} 
+                              className="p-1.5 text-[#5F6368] hover:text-[#0B57D0] hover:bg-[#E8F0FE] rounded-lg transition-colors"
+                              title="Editar gasto, parcelas ou categoria"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => handleRemoveConta(conta.id)} 
+                              className="p-1.5 text-[#5F6368] hover:text-[#B3261E] hover:bg-[#F9DEDC] rounded-lg transition-colors"
+                              title="Excluir conta"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1912,10 +2210,15 @@ export default function App() {
           <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-[#041E49] flex items-center gap-2">
-                {editingGastoId ? (
+                {editingContaId ? (
                   <>
                     <Pencil className="w-6 h-6 text-[#0B57D0]" />
-                    Editar Gasto
+                    {newExpenseType === 'Parcela' ? 'Editar Gasto Parcelado' : 'Editar Gasto Fixo'}
+                  </>
+                ) : editingGastoId ? (
+                  <>
+                    <Pencil className="w-6 h-6 text-[#0B57D0]" />
+                    Editar Gasto Variável
                   </>
                 ) : (
                   'Adicionar Novo Gasto'
@@ -1926,6 +2229,7 @@ export default function App() {
                 onClick={() => {
                   setIsAddModalOpen(false);
                   setEditingGastoId(null);
+                  setEditingContaId(null);
                 }} 
                 className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors"
               >
@@ -1943,49 +2247,47 @@ export default function App() {
                   onChange={e => {
                     const val = e.target.value;
                     setNewExpenseName(val);
-                    if (!isCategoryManual && !editingGastoId) {
+                    if (!isCategoryManual && !editingGastoId && !editingContaId) {
                       setNewExpenseCategory(getCategoryFromName(val, state.categorias || DEFAULT_CATEGORIES));
                     }
                   }}
-                  placeholder="Ex: Uber Centro, Mercado, TV Samsung..."
+                  placeholder="Ex: Uber Centro, Mercado, TV Samsung, Aluguel..."
                   className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors"
                 />
               </div>
 
-              {!editingGastoId && (
-                <div>
-                  <label className="block text-[#041E49] font-bold mb-1.5">Que tipo de gasto é esse?</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button 
-                      type="button"
-                      onClick={() => setNewExpenseType('Fixo')}
-                      className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Fixo' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
-                    >
-                      <span className={`font-bold ${newExpenseType === 'Fixo' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Fixo</span>
-                      <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Luz, Água</span>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setNewExpenseType('Parcela')}
-                      className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Parcela' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
-                    >
-                      <span className={`font-bold ${newExpenseType === 'Parcela' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Parcela</span>
-                      <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: TV em 10x</span>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setNewExpenseType('Variável')}
-                      className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Variável' ? 'border-[#E67C3B] bg-[#FFF8F3]' : 'border-[#DADCE0] bg-white'}`}
-                    >
-                      <span className={`font-bold ${newExpenseType === 'Variável' ? 'text-[#A0460A]' : 'text-[#041E49]'}`}>Variável</span>
-                      <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Padaria</span>
-                    </button>
-                  </div>
+              <div>
+                <label className="block text-[#041E49] font-bold mb-1.5">Que tipo de gasto é esse?</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => setNewExpenseType('Fixo')}
+                    className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Fixo' ? 'border-[#0B57D0] bg-[#E8F0FE] ring-1 ring-[#0B57D0]' : 'border-[#DADCE0] bg-white'}`}
+                  >
+                    <span className={`font-bold ${newExpenseType === 'Fixo' ? 'text-[#0B57D0]' : 'text-[#041E49]'}`}>Fixo</span>
+                    <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Luz, Aluguel</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setNewExpenseType('Parcela')}
+                    className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Parcela' ? 'border-[#0B57D0] bg-[#E8F0FE] ring-1 ring-[#0B57D0]' : 'border-[#DADCE0] bg-white'}`}
+                  >
+                    <span className={`font-bold ${newExpenseType === 'Parcela' ? 'text-[#0B57D0]' : 'text-[#041E49]'}`}>Parcela</span>
+                    <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: TV em 10x</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setNewExpenseType('Variável')}
+                    className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Variável' ? 'border-[#0B57D0] bg-[#E8F0FE] ring-1 ring-[#0B57D0]' : 'border-[#DADCE0] bg-white'}`}
+                  >
+                    <span className={`font-bold ${newExpenseType === 'Variável' ? 'text-[#0B57D0]' : 'text-[#041E49]'}`}>Variável</span>
+                    <span className="text-[10px] sm:text-xs text-[#5F6368] mt-0.5">Ex: Padaria, Uber</span>
+                  </button>
                 </div>
-              )}
+              </div>
 
               {/* Forma de Pagamento para Gastos Variáveis */}
-              {(editingGastoId || newExpenseType === 'Variável') && (
+              {newExpenseType === 'Variável' && (
                 <div className="p-3.5 bg-[#F8F9FA] rounded-2xl border border-[#DADCE0] animate-in fade-in duration-200">
                   <label className="block text-xs font-bold text-[#041E49] uppercase tracking-wider mb-2">
                     Forma de Pagamento
@@ -2033,7 +2335,7 @@ export default function App() {
               )}
 
               {/* Seção detalhada para Parcelamentos */}
-              {!editingGastoId && newExpenseType === 'Parcela' && (
+              {newExpenseType === 'Parcela' && (
                 <div className="p-4 bg-[#F8F9FA] rounded-2xl border border-[#DADCE0] space-y-4 animate-in fade-in duration-200">
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -2160,7 +2462,7 @@ export default function App() {
                 />
 
                 {/* Resumo dinâmico em tempo real para Parcelamentos */}
-                {!editingGastoId && newExpenseType === 'Parcela' && newExpenseValue && (
+                {newExpenseType === 'Parcela' && newExpenseValue && (
                   <div className="mt-2.5 p-3 bg-[#E8F0FE] rounded-xl border border-[#D2E3FC] text-xs text-[#041E49] space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[#0B57D0]">Resumo do Parcelamento</span>
@@ -2186,7 +2488,7 @@ export default function App() {
                             {parcelasTotal} parcelas • Total da compra: {formatBRL(valTotal)}
                           </p>
                           <p className="text-[11px] text-[#5F6368] pt-1 border-t border-[#D2E3FC]">
-                            Nome na fatura: <strong>{newExpenseName.trim() || 'Compra'} ({String(parcelaAtual).padStart(2, '0')}/{String(parcelasTotal).padStart(2, '0')})</strong>
+                            Nome no lançamento: <strong>{newExpenseName.trim() || 'Compra'} ({String(parcelaAtual).padStart(2, '0')}/{String(parcelasTotal).padStart(2, '0')})</strong>
                           </p>
                         </div>
                       );
@@ -2210,104 +2512,104 @@ export default function App() {
                 />
               </div>
 
-              {/* Categorias - exibidas para gastos variáveis ou edição de gasto */}
-              {(editingGastoId || newExpenseType === 'Variável') && (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-[#041E49] font-bold text-sm">Categoria</label>
-                    <button 
-                      type="button" 
-                      onClick={() => setIsInlineAddingCategory(!isInlineAddingCategory)} 
-                      className="text-xs text-[#0B57D0] font-semibold hover:underline flex items-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Nova Categoria
-                    </button>
-                  </div>
+              {/* Categorias - exibidas e selecionáveis para TODOS os tipos de gastos (Fixo, Parcela e Variável) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[#041E49] font-bold text-sm">
+                    Categoria {newExpenseType === 'Parcela' ? 'da Parcela' : newExpenseType === 'Fixo' ? 'do Gasto Fixo' : 'do Gasto'}
+                  </label>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsInlineAddingCategory(!isInlineAddingCategory)} 
+                    className="text-xs text-[#0B57D0] font-semibold hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Nova Categoria
+                  </button>
+                </div>
 
-                  {isInlineAddingCategory && (
-                    <div className="mb-3 p-2.5 bg-[#F8F9FA] rounded-xl border border-[#0B57D0]/40 flex items-center gap-2 animate-in fade-in duration-200">
-                      <input
-                        type="text"
-                        placeholder="Nome da nova categoria (ex: Livros)"
-                        value={inlineCategoryInput}
-                        onChange={e => setInlineCategoryInput(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleQuickCreateCategory();
-                          }
-                        }}
-                        autoFocus
-                        className="flex-1 bg-white border border-[#DADCE0] rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#0B57D0]"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleQuickCreateCategory}
-                        className="bg-[#0B57D0] text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-[#0842A0] transition-colors"
-                      >
-                        Adicionar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsInlineAddingCategory(false);
-                          setInlineCategoryInput('');
-                        }}
-                        className="text-[#5F6368] hover:text-[#202124] p-1"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1 py-1 mb-2">
-                    {(state.categorias || DEFAULT_CATEGORIES).map(cat => {
-                      const currentCat = isCategoryManual 
-                        ? newExpenseCategory 
-                        : (getCategoryFromName(newExpenseName, state.categorias || DEFAULT_CATEGORIES) || 'Outros');
-                      const isSelected = currentCat === cat;
-                      const catColor = getCategoryColor(cat);
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => {
-                            setNewExpenseCategory(cat);
-                            setIsCategoryManual(true);
-                          }}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
-                            isSelected
-                              ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs font-semibold'
-                              : 'bg-[#F1F3F4] text-[#202124] border-transparent hover:bg-[#E8EAED]'
-                          }`}
-                        >
-                          <span 
-                            className="w-2 h-2 rounded-full shrink-0" 
-                            style={{ backgroundColor: isSelected ? '#FFFFFF' : catColor }} 
-                          />
-                          {cat}
-                        </button>
-                      );
-                    })}
+                {isInlineAddingCategory && (
+                  <div className="mb-3 p-2.5 bg-[#F8F9FA] rounded-xl border border-[#0B57D0]/40 flex items-center gap-2 animate-in fade-in duration-200">
+                    <input
+                      type="text"
+                      placeholder="Nome da nova categoria (ex: Livros)"
+                      value={inlineCategoryInput}
+                      onChange={e => setInlineCategoryInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleQuickCreateCategory();
+                        }
+                      }}
+                      autoFocus
+                      className="flex-1 bg-white border border-[#DADCE0] rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#0B57D0]"
+                    />
                     <button
                       type="button"
-                      onClick={() => setIsInlineAddingCategory(true)}
-                      className="px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-[#0B57D0] text-[#0B57D0] hover:bg-[#E8F0FE] transition-colors flex items-center gap-1"
+                      onClick={handleQuickCreateCategory}
+                      className="bg-[#0B57D0] text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-[#0842A0] transition-colors"
                     >
-                      <Plus className="w-3 h-3" />
-                      Criar nova
+                      Adicionar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsInlineAddingCategory(false);
+                        setInlineCategoryInput('');
+                      }}
+                      className="text-[#5F6368] hover:text-[#202124] p-1"
+                    >
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <p className="text-xs text-[#5F6368]">Detectada automaticamente pelo nome ou toque para escolher.</p>
+                )}
+
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1 py-1 mb-2">
+                  {(state.categorias || DEFAULT_CATEGORIES).map(cat => {
+                    const currentCat = isCategoryManual 
+                      ? newExpenseCategory 
+                      : (getCategoryFromName(newExpenseName, state.categorias || DEFAULT_CATEGORIES) || 'Outros');
+                    const isSelected = currentCat === cat;
+                    const catColor = getCategoryColor(cat);
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          setNewExpenseCategory(cat);
+                          setIsCategoryManual(true);
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs font-semibold'
+                            : 'bg-[#F1F3F4] text-[#202124] border-transparent hover:bg-[#E8EAED]'
+                        }`}
+                      >
+                        <span 
+                          className="w-2 h-2 rounded-full shrink-0" 
+                          style={{ backgroundColor: isSelected ? '#FFFFFF' : catColor }} 
+                        />
+                        {cat}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setIsInlineAddingCategory(true)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-[#0B57D0] text-[#0B57D0] hover:bg-[#E8F0FE] transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Criar nova
+                  </button>
                 </div>
-              )}
+                <p className="text-xs text-[#5F6368]">Detectada automaticamente pelo nome ou clique para escolher.</p>
+              </div>
               
               <button 
                 type="submit"
                 className="w-full bg-[#0F9D58] hover:bg-[#0B8043] text-white font-bold py-4 rounded-xl transition-colors mt-2 text-lg shadow-sm"
               >
-                {editingGastoId ? 'Salvar Alterações' : 'Salvar Gasto'}
+                {editingContaId || editingGastoId ? 'Salvar Alterações' : 'Salvar Gasto'}
               </button>
             </form>
           </div>

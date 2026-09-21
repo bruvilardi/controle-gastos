@@ -9,6 +9,11 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok' });
+  });
+
   // AI categorization route
   app.post('/api/categorize', async (req, res) => {
     try {
@@ -74,4 +79,6 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('Failed to start server:', err);
+});
