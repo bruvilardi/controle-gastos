@@ -1,10 +1,20 @@
+export type FormaPagamento = 'credito' | 'debito' | 'boleto' | 'pix' | 'dinheiro';
+
+export interface GastoCompartilhado {
+  comQuem: string; // ex: 'Marcelo'
+  valorParteOutro: number; // ex: 45.00
+  status: 'pendente' | 'recebido';
+  itemSaldoId?: string; // ID da entrada Pix no saldo
+}
+
 export interface Gasto {
   id: string;
   valor: number;
   categoria: string;
   descricao: string;
   data: string; // ISO date
-  formaPagamento?: 'debito' | 'credito';
+  formaPagamento?: FormaPagamento | string;
+  compartilhado?: GastoCompartilhado;
 }
 
 export interface Conta {
@@ -17,6 +27,7 @@ export interface Conta {
   parcelaAtual?: number;
   parcelasTotal?: number;
   valorTotal?: number;
+  formaPagamento?: FormaPagamento | string;
 }
 
 export interface Teto {
@@ -36,8 +47,13 @@ export interface ItemSaldo {
   id: string;
   descricao: string;
   valor: number;
-  origem?: string; // 'Salário' | 'Freela' | 'Vendas' | 'Investimentos' | 'Outros'
+  origem?: string; // 'Salário' | 'Freela' | 'Vendas' | 'Investimentos' | 'Racha / Reembolso' | 'Outros'
   data?: string;
+  gastoVinculadoId?: string; // ID do gasto associado
+  rachaInfo?: {
+    comQuem: string;
+    gastoDescricao: string;
+  };
 }
 
 export interface AppState {
