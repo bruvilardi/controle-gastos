@@ -236,6 +236,267 @@ const parseCurrency = (value: string | number): number => {
   return parseFloat(clean) || 0;
 };
 
+export const getCategoryFromName = (name: string, availableCategories?: string[]): string => {
+  const n = name.toLowerCase();
+
+  // Check custom or dynamic categories first
+  if (availableCategories) {
+    for (const cat of availableCategories) {
+      if (cat.toLowerCase() !== 'outros' && n.includes(cat.toLowerCase())) {
+        return cat;
+      }
+    }
+  }
+
+  if (n.includes('uber') || n.includes('99') || n.includes('corrida') || n.includes('taxi') || n.includes('táxi')) return 'Uber';
+  if (n.includes('disco') || n.includes('vinil') || n.includes('cd') || n.includes('música') || n.includes('musica')) return 'Discos';
+  if (n.includes('delivery') || n.includes('ifood') || n.includes('rappi') || n.includes('lanche')) return 'Delivery';
+  if (n.includes('mercado') || n.includes('supermercado') || n.includes('assai') || n.includes('atacadão') || n.includes('feira') || n.includes('compras') || n.includes('sacolão') || n.includes('hortifruti')) return 'Mercado';
+  if (n.includes('restaurante') || n.includes('almoço') || n.includes('almoco') || n.includes('jantar') || n.includes('café') || n.includes('cafe') || n.includes('padaria') || n.includes('pizza') || n.includes('hambúrguer') || n.includes('bar ') || n.includes('churrasco') || n.includes('comida') || n.includes('marmita') || n.includes('esfiha') || n.includes('sushi') || n.includes('alimentação') || n.includes('alimentacao')) return 'Alimentação';
+  if (n.includes('farmácia') || n.includes('farmacia') || n.includes('droga') || n.includes('médico') || n.includes('medico') || n.includes('saúde') || n.includes('saude') || n.includes('remedio') || n.includes('remédio') || n.includes('exame') || n.includes('dentista') || n.includes('hospital') || n.includes('consulta') || n.includes('óptica') || n.includes('optica') || n.includes('academia') || n.includes('ginástica') || n.includes('ginastica') || n.includes('musculação') || n.includes('musculacao') || n.includes('crossfit') || n.includes('pilates')) return 'Saúde';
+  if (n.includes('posto') || n.includes('gasolina') || n.includes('combustível') || n.includes('combustivel') || n.includes('etanol') || n.includes('ônibus') || n.includes('onibus') || n.includes('metro') || n.includes('metrô') || n.includes('passagem') || n.includes('pedágio') || n.includes('estacionamento') || n.includes('transporte') || n.includes('bilhete')) return 'Transporte';
+  if (n.includes('aluguel') || n.includes('condomínio') || n.includes('condominio') || n.includes('iptu') || n.includes('luz') || n.includes('água') || n.includes('agua') || n.includes('gás') || n.includes('gas') || n.includes('moradia') || n.includes('reforma') || n.includes('móveis') || n.includes('moveis') || n.includes('casa') || n.includes('leroy')) return 'Moradia';
+  if (n.includes('curso') || n.includes('faculdade') || n.includes('escola') || n.includes('livro') || n.includes('udemy') || n.includes('educação') || n.includes('educacao') || n.includes('mensalidade') || n.includes('estudo') || n.includes('partner')) return 'Educação';
+  if (n.includes('roupa') || n.includes('calçado') || n.includes('calcado') || n.includes('tenis') || n.includes('tênis') || n.includes('sapato') || n.includes('vestuário') || n.includes('vestuario') || n.includes('camisa') || n.includes('calça') || n.includes('zara') || n.includes('renner') || n.includes('c&a')) return 'Vestuário';
+  if (n.includes('netflix') || n.includes('spotify') || n.includes('amazon') || n.includes('prime') || n.includes('disney') || n.includes('hbo') || n.includes('youtube') || n.includes('assinatura') || n.includes('software') || n.includes('streaming') || n.includes('apple') || n.includes('icloud') || n.includes('openai') || n.includes('chatgpt') || n.includes('globoplay') || n.includes('globo')) return 'Assinaturas';
+  if (n.includes('barbearia') || n.includes('cabelo') || n.includes('salão') || n.includes('salao') || n.includes('manicure') || n.includes('cosmético') || n.includes('perfume') || n.includes('beleza') || n.includes('cuidados') || n.includes('depilação') || n.includes('estética') || n.includes('estetica') || n.includes('skincare')) return 'Cuidados Pessoais';
+  if (n.includes('pet') || n.includes('veterinário') || n.includes('veterinario') || n.includes('ração') || n.includes('racao') || n.includes('cachorro') || n.includes('gato') || n.includes('petshop') || n.includes('cobasi') || n.includes('petz')) return 'Pet';
+  if (n.includes('viagem') || n.includes('hotel') || n.includes('pousada') || n.includes('airbnb') || n.includes('passagens') || n.includes('voo') || n.includes('mala') || n.includes('turismo') || n.includes('booking')) return 'Viagem';
+  if (n.includes('cinema') || n.includes('show') || n.includes('teatro') || n.includes('festa') || n.includes('lazer') || n.includes('jogo') || n.includes('game') || n.includes('shopping') || n.includes('ingresso') || n.includes('parque') || n.includes('balada')) return 'Lazer';
+  return 'Outros';
+};
+
+const LOCAL_STORAGE_KEYS = [
+  'qpg_simple_state_v5',
+  'qpg_simple_state_v4',
+  'qpg_simple_state_v3',
+  'qpg_simple_state',
+  'qpg_state'
+];
+
+export const getMonthNamePT = (yearMonthStr: string): string => {
+  if (!yearMonthStr) return '';
+  const parts = yearMonthStr.split('-');
+  const m = parseInt(parts[1], 10);
+  const nomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  return nomes[m - 1] || '';
+};
+
+export const calculateParcelaFromDate = (
+  purchaseDateStr: string,
+  totalParcelas: number,
+  referenceYearMonth?: string
+): { parcela: number; diffMeses: number; isPastPurchase: boolean } => {
+  if (!purchaseDateStr) return { parcela: 1, diffMeses: 0, isPastPurchase: false };
+  const parts = purchaseDateStr.split('-');
+  if (parts.length < 2) return { parcela: 1, diffMeses: 0, isPastPurchase: false };
+  const pYear = parseInt(parts[0], 10);
+  const pMonth = parseInt(parts[1], 10);
+  if (isNaN(pYear) || isNaN(pMonth)) return { parcela: 1, diffMeses: 0, isPastPurchase: false };
+
+  let refYear: number;
+  let refMonth: number;
+  if (referenceYearMonth && referenceYearMonth.includes('-')) {
+    const refParts = referenceYearMonth.split('-');
+    refYear = parseInt(refParts[0], 10);
+    refMonth = parseInt(refParts[1], 10);
+  } else {
+    const now = new Date();
+    refYear = now.getFullYear();
+    refMonth = now.getMonth() + 1;
+  }
+
+  const diffMeses = (refYear - pYear) * 12 + (refMonth - pMonth);
+  if (diffMeses <= 0) {
+    return { parcela: 1, diffMeses: 0, isPastPurchase: false };
+  }
+
+  // Se a compra foi feita há X meses atrás:
+  // Mês da compra (0 meses de diferença) = parcela 1
+  // 1 mês depois = parcela 2
+  // 2 meses depois = parcela 3
+  const calculated = 1 + diffMeses;
+  const safeTotal = Math.max(1, totalParcelas);
+  const clamped = Math.min(safeTotal, Math.max(1, calculated));
+
+  return { parcela: clamped, diffMeses, isPastPurchase: true };
+};
+
+const advanceInstallments = (contas: Conta[]): Conta[] => {
+  return contas.map(c => {
+    if (c.grupo === 'Parcelamentos') {
+      const match = c.nome.match(/(\d+)\/(\d+)/);
+      if (match) {
+        const current = parseInt(match[1], 10);
+        const total = parseInt(match[2], 10);
+        if (current < total) {
+          const next = current + 1;
+          const padLength = match[1].length;
+          const formattedNext = padLength > 1 ? String(next).padStart(padLength, '0') : String(next);
+          return {
+            ...c,
+            nome: c.nome.replace(`${match[1]}/${match[2]}`, `${formattedNext}/${match[2]}`),
+            parcelaAtual: next,
+            parcelasTotal: total
+          };
+        }
+      }
+      
+      const matchDe = c.nome.match(/(\d+)\s+de\s+(\d+)/);
+      if (matchDe) {
+        const current = parseInt(matchDe[1], 10);
+        const total = parseInt(matchDe[2], 10);
+        if (current < total) {
+          const next = current + 1;
+          return {
+            ...c,
+            nome: c.nome.replace(`${matchDe[1]} de ${matchDe[2]}`, `${next} de ${total}`),
+            parcelaAtual: next,
+            parcelasTotal: total
+          };
+        }
+      }
+    }
+    return c;
+  });
+};
+
+const mergeLocalFallback = (base: AppState): { mergedState: AppState; recoveredCount: number } => {
+  let merged = { ...base };
+  let recoveredCount = 0;
+
+  for (const key of LOCAL_STORAGE_KEYS) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') continue;
+
+      // Gastos
+      if (Array.isArray(parsed.gastos) && parsed.gastos.length > 0) {
+        const existingIds = new Set((merged.gastos || []).map((g: any) => g.id));
+        const newGastos = parsed.gastos.filter((g: any) => g && g.id && !existingIds.has(g.id));
+        if (newGastos.length > 0) {
+          merged.gastos = [...(merged.gastos || []), ...newGastos];
+          recoveredCount += newGastos.length;
+        }
+      }
+
+      // Itens de saldo
+      if (Array.isArray(parsed.itensSaldo) && parsed.itensSaldo.length > 0) {
+        const existingSaldoIds = new Set((merged.itensSaldo || []).map((s: any) => s.id));
+        const newSaldo = parsed.itensSaldo.filter((s: any) => s && s.id && !existingSaldoIds.has(s.id));
+        if (newSaldo.length > 0) {
+          merged.itensSaldo = [...(merged.itensSaldo || []), ...newSaldo];
+          recoveredCount += newSaldo.length;
+          if (merged.saldoConta === 0) {
+            merged.saldoConta = merged.itensSaldo.reduce((acc: number, curr: any) => acc + (Number(curr.valor) || 0), 0);
+          }
+        }
+      }
+
+      // Contas
+      if ((!merged.contas || merged.contas.length === 0) && Array.isArray(parsed.contas) && parsed.contas.length > 0) {
+        merged.contas = parsed.contas;
+        recoveredCount += parsed.contas.length;
+      }
+
+      // Metas
+      if ((!merged.metasEconomia || merged.metasEconomia.length === 0) && Array.isArray(parsed.metasEconomia) && parsed.metasEconomia.length > 0) {
+        merged.metasEconomia = parsed.metasEconomia;
+      }
+    } catch (e) {
+      console.warn("Could not check local storage key", key, e);
+    }
+  }
+
+  return { mergedState: merged, recoveredCount };
+};
+
+const normalizeAppState = (raw: AppState): AppState => {
+  let parsedState = { ...raw };
+  if (!parsedState.rendaMensal) parsedState.rendaMensal = INITIAL_STATE.rendaMensal;
+  if (!parsedState.mesAtual) parsedState.mesAtual = INITIAL_STATE.mesAtual;
+
+  const currentMonth = new Date().toISOString().substring(0, 7);
+
+  // Ensure tetos contains Uber
+  if (!parsedState.tetos || parsedState.tetos.length === 0) {
+    parsedState.tetos = INITIAL_STATE.tetos;
+  } else {
+    if (!parsedState.tetos.some(t => t.categoria.toLowerCase() === 'uber')) {
+      parsedState.tetos.push({ id: 't4', categoria: 'Uber', limite: 300 });
+    }
+  }
+
+  // Ensure any past Uber expenses are tagged under Uber category
+  if (parsedState.gastos) {
+    parsedState.gastos = parsedState.gastos.map(g => {
+      if ((g.categoria === 'Transporte' || g.categoria === 'Outros') && g.descricao.toLowerCase().includes('uber')) {
+        return { ...g, categoria: 'Uber' };
+      }
+      return g;
+    });
+  } else {
+    parsedState.gastos = [];
+  }
+
+  // Ensure metasEconomia is present
+  if (!parsedState.metasEconomia || parsedState.metasEconomia.length === 0) {
+    const baseMeta = (parsedState as any).metaPoupanca || 500;
+    parsedState.metasEconomia = [
+      { id: 'm1', titulo: 'Poupança Mensal', valorAlvo: baseMeta, valorAtual: Math.round(baseMeta * 0.7) },
+      { id: 'm2', titulo: 'Reserva de Emergência', valorAlvo: 300, valorAtual: 150 },
+    ];
+  }
+
+  // Ensure itensSaldo is present
+  if (parsedState.itensSaldo === undefined) {
+    parsedState.itensSaldo = [
+      { id: 'sal-1', descricao: 'Salário Mensal', valor: parsedState.saldoConta || parsedState.rendaMensal || 7914.00, origem: 'Salário' }
+    ];
+  }
+
+  // Ensure categorias has default and custom categories merged
+  const loadedCats = parsedState.categorias || [];
+  const usedCats = [
+    ...(parsedState.gastos || []).map(g => g.categoria),
+    ...(parsedState.tetos || []).map(t => t.categoria)
+  ];
+  const allUniqueCats = Array.from(new Set([...DEFAULT_CATEGORIES, ...loadedCats, ...usedCats])).filter(Boolean);
+  parsedState.categorias = allUniqueCats;
+
+  if (parsedState.contas && parsedState.contas.length > 0) {
+    parsedState.contas = parsedState.contas.map(c => {
+      let defaultFp: FormaPagamento = c.grupo === 'Parcelamentos' ? 'credito' : 'debito';
+      const nl = c.nome.toLowerCase();
+      if (nl.includes('boleto') || nl.includes('neoenergia') || nl.includes('das') || nl.includes('receita') || nl.includes('aluguel') || nl.includes('iptu')) {
+        defaultFp = 'boleto';
+      } else if (nl.includes('google') || nl.includes('apple') || nl.includes('hbo') || nl.includes('ifood') || nl.includes('netflix') || nl.includes('spotify') || nl.includes('globoplay')) {
+        defaultFp = 'credito';
+      }
+      return {
+        ...c,
+        categoria: c.categoria || getCategoryFromName(c.nome, allUniqueCats) || 'Outros',
+        formaPagamento: c.formaPagamento || defaultFp
+      };
+    });
+  } else {
+    parsedState.contas = INITIAL_STATE.contas;
+  }
+
+  if (parsedState.mesAtual !== currentMonth) {
+    parsedState = {
+      ...parsedState,
+      mesAtual: currentMonth,
+      saldoConta: (parsedState.saldoConta || 0) + (parsedState.rendaMensal || 0),
+      contas: advanceInstallments(parsedState.contas)
+    };
+  }
+
+  return parsedState;
+};
+
 export default function App() {
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -695,36 +956,6 @@ export default function App() {
     });
   };
 
-  const getCategoryFromName = (name: string, availableCategories?: string[]) => {
-    const n = name.toLowerCase();
-
-    // Check custom or dynamic categories first
-    if (availableCategories) {
-      for (const cat of availableCategories) {
-        if (cat.toLowerCase() !== 'outros' && n.includes(cat.toLowerCase())) {
-          return cat;
-        }
-      }
-    }
-
-    if (n.includes('uber') || n.includes('99') || n.includes('corrida') || n.includes('taxi') || n.includes('táxi')) return 'Uber';
-    if (n.includes('disco') || n.includes('vinil') || n.includes('cd') || n.includes('música') || n.includes('musica')) return 'Discos';
-    if (n.includes('delivery') || n.includes('ifood') || n.includes('rappi') || n.includes('lanche')) return 'Delivery';
-    if (n.includes('mercado') || n.includes('supermercado') || n.includes('assai') || n.includes('atacadão') || n.includes('feira') || n.includes('compras') || n.includes('sacolão') || n.includes('hortifruti')) return 'Mercado';
-    if (n.includes('restaurante') || n.includes('almoço') || n.includes('almoco') || n.includes('jantar') || n.includes('café') || n.includes('cafe') || n.includes('padaria') || n.includes('pizza') || n.includes('hambúrguer') || n.includes('bar ') || n.includes('churrasco') || n.includes('comida') || n.includes('marmita') || n.includes('esfiha') || n.includes('sushi') || n.includes('alimentação') || n.includes('alimentacao')) return 'Alimentação';
-    if (n.includes('farmácia') || n.includes('farmacia') || n.includes('droga') || n.includes('médico') || n.includes('medico') || n.includes('saúde') || n.includes('saude') || n.includes('remedio') || n.includes('remédio') || n.includes('exame') || n.includes('dentista') || n.includes('hospital') || n.includes('consulta') || n.includes('óptica') || n.includes('optica') || n.includes('academia') || n.includes('ginástica') || n.includes('ginastica') || n.includes('musculação') || n.includes('musculacao') || n.includes('crossfit') || n.includes('pilates')) return 'Saúde';
-    if (n.includes('posto') || n.includes('gasolina') || n.includes('combustível') || n.includes('combustivel') || n.includes('etanol') || n.includes('ônibus') || n.includes('onibus') || n.includes('metro') || n.includes('metrô') || n.includes('passagem') || n.includes('pedágio') || n.includes('estacionamento') || n.includes('transporte') || n.includes('bilhete')) return 'Transporte';
-    if (n.includes('aluguel') || n.includes('condomínio') || n.includes('condominio') || n.includes('iptu') || n.includes('luz') || n.includes('água') || n.includes('agua') || n.includes('gás') || n.includes('gas') || n.includes('moradia') || n.includes('reforma') || n.includes('móveis') || n.includes('moveis') || n.includes('casa') || n.includes('leroy')) return 'Moradia';
-    if (n.includes('curso') || n.includes('faculdade') || n.includes('escola') || n.includes('livro') || n.includes('udemy') || n.includes('educação') || n.includes('educacao') || n.includes('mensalidade') || n.includes('estudo') || n.includes('partner')) return 'Educação';
-    if (n.includes('roupa') || n.includes('calçado') || n.includes('calcado') || n.includes('tenis') || n.includes('tênis') || n.includes('sapato') || n.includes('vestuário') || n.includes('vestuario') || n.includes('camisa') || n.includes('calça') || n.includes('zara') || n.includes('renner') || n.includes('c&a')) return 'Vestuário';
-    if (n.includes('netflix') || n.includes('spotify') || n.includes('amazon') || n.includes('prime') || n.includes('disney') || n.includes('hbo') || n.includes('youtube') || n.includes('assinatura') || n.includes('software') || n.includes('streaming') || n.includes('apple') || n.includes('icloud') || n.includes('openai') || n.includes('chatgpt') || n.includes('globoplay') || n.includes('globo')) return 'Assinaturas';
-    if (n.includes('barbearia') || n.includes('cabelo') || n.includes('salão') || n.includes('salao') || n.includes('manicure') || n.includes('cosmético') || n.includes('perfume') || n.includes('beleza') || n.includes('cuidados') || n.includes('depilação') || n.includes('estética') || n.includes('estetica') || n.includes('skincare')) return 'Cuidados Pessoais';
-    if (n.includes('pet') || n.includes('veterinário') || n.includes('veterinario') || n.includes('ração') || n.includes('racao') || n.includes('cachorro') || n.includes('gato') || n.includes('petshop') || n.includes('cobasi') || n.includes('petz')) return 'Pet';
-    if (n.includes('viagem') || n.includes('hotel') || n.includes('pousada') || n.includes('airbnb') || n.includes('passagens') || n.includes('voo') || n.includes('mala') || n.includes('turismo') || n.includes('booking')) return 'Viagem';
-    if (n.includes('cinema') || n.includes('show') || n.includes('teatro') || n.includes('festa') || n.includes('lazer') || n.includes('jogo') || n.includes('game') || n.includes('shopping') || n.includes('ingresso') || n.includes('parque') || n.includes('balada')) return 'Lazer';
-    return 'Outros';
-  };
-
   const handleOpenAddModal = (
     defaultType: 'Fixo' | 'Parcela' | 'Variável' = 'Variável',
     defaultShared = false,
@@ -734,10 +965,14 @@ export default function App() {
     setEditingContaId(null);
     setNewExpenseName('');
     setNewExpenseValue('');
-    setNewExpenseDate(getTodayLocal());
+    const today = getTodayLocal();
+    setNewExpenseDate(today);
     setNewExpenseType(defaultType);
     setParcelasTotal(10);
-    setParcelaAtual(1);
+    const initialCalc = defaultType === 'Parcela' 
+      ? calculateParcelaFromDate(today, 10, state.mesAtual).parcela 
+      : 1;
+    setParcelaAtual(initialCalc);
     setTipoValorParcela('parcela');
     setNewExpenseCategory(defaultShared ? 'Delivery' : 'Outros');
     setIsCategoryManual(defaultShared);
@@ -809,11 +1044,15 @@ export default function App() {
 
     setNewExpenseValue(conta.valor ? conta.valor.toFixed(2).replace('.', ',') : '');
 
-    // Formata a data com o dia de vencimento
-    const diaNum = Math.max(1, Math.min(31, Number(conta.diaVencimento) || 1));
-    const now = new Date();
-    const yearMonth = state.mesAtual || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    setNewExpenseDate(`${yearMonth}-${String(diaNum).padStart(2, '0')}`);
+    // Formata a data da compra ou com o dia de vencimento
+    if (conta.dataCompra) {
+      setNewExpenseDate(conta.dataCompra);
+    } else {
+      const diaNum = Math.max(1, Math.min(31, Number(conta.diaVencimento) || 1));
+      const now = new Date();
+      const yearMonth = state.mesAtual || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      setNewExpenseDate(`${yearMonth}-${String(diaNum).padStart(2, '0')}`);
+    }
 
     setNewExpenseType(conta.grupo === 'Parcelamentos' ? 'Parcela' : 'Fixo');
     setTipoValorParcela('parcela');
@@ -896,7 +1135,8 @@ export default function App() {
             formaPagamento: newExpenseForma,
             parcelaAtual: atualP,
             parcelasTotal: totalP,
-            valorTotal: tipoValorParcela === 'total' ? val : valorFinal * totalP
+            valorTotal: tipoValorParcela === 'total' ? val : valorFinal * totalP,
+            dataCompra: finalDate
           } : c)
         }));
       } else if (newExpenseType === 'Fixo') {
@@ -1007,7 +1247,8 @@ export default function App() {
             formaPagamento: newExpenseForma,
             parcelaAtual: atualP,
             parcelasTotal: totalP,
-            valorTotal: tipoValorParcela === 'total' ? val : valorFinal * totalP
+            valorTotal: tipoValorParcela === 'total' ? val : valorFinal * totalP,
+            dataCompra: finalDate
           }]
         }));
       } else {
@@ -1104,7 +1345,8 @@ export default function App() {
           formaPagamento: newExpenseForma,
           parcelaAtual: atualP,
           parcelasTotal: totalP,
-          valorTotal: tipoValorParcela === 'total' ? val : valorFinal * totalP
+          valorTotal: tipoValorParcela === 'total' ? val : valorFinal * totalP,
+          dataCompra: finalDate
         }]
       }));
     } else {
@@ -1152,231 +1394,59 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<'synced' | 'saving' | 'offline'>('synced');
   const [isSyncing, setIsSyncing] = useState(false);
   const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
-  const lastSavedJsonRef = useRef<string>('');
-  const isSavingRef = useRef<boolean>(false);
+  const lastRemoteJsonRef = useRef<string>('');
+  const saveTimeoutRef = useRef<any>(null);
+  const isInitialLoadRef = useRef<boolean>(true);
 
-  const LOCAL_STORAGE_KEYS = [
-    'qpg_simple_state_v5',
-    'qpg_simple_state_v4',
-    'qpg_simple_state_v3',
-    'qpg_simple_state',
-    'qpg_state'
-  ];
-
-  const mergeLocalFallback = useCallback((base: AppState): { mergedState: AppState; recoveredCount: number } => {
-    let merged = { ...base };
-    let recoveredCount = 0;
-
-    for (const key of LOCAL_STORAGE_KEYS) {
-      try {
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object') continue;
-
-        // Gastos
-        if (Array.isArray(parsed.gastos) && parsed.gastos.length > 0) {
-          const existingIds = new Set((merged.gastos || []).map((g: any) => g.id));
-          const newGastos = parsed.gastos.filter((g: any) => g && g.id && !existingIds.has(g.id));
-          if (newGastos.length > 0) {
-            merged.gastos = [...(merged.gastos || []), ...newGastos];
-            recoveredCount += newGastos.length;
-          }
-        }
-
-        // Itens de saldo
-        if (Array.isArray(parsed.itensSaldo) && parsed.itensSaldo.length > 0) {
-          const existingSaldoIds = new Set((merged.itensSaldo || []).map((s: any) => s.id));
-          const newSaldo = parsed.itensSaldo.filter((s: any) => s && s.id && !existingSaldoIds.has(s.id));
-          if (newSaldo.length > 0) {
-            merged.itensSaldo = [...(merged.itensSaldo || []), ...newSaldo];
-            recoveredCount += newSaldo.length;
-            if (merged.saldoConta === 0) {
-              merged.saldoConta = merged.itensSaldo.reduce((acc: number, curr: any) => acc + (Number(curr.valor) || 0), 0);
-            }
-          }
-        }
-
-        // Contas
-        if ((!merged.contas || merged.contas.length === 0) && Array.isArray(parsed.contas) && parsed.contas.length > 0) {
-          merged.contas = parsed.contas;
-          recoveredCount += parsed.contas.length;
-        }
-
-        // Metas
-        if ((!merged.metasEconomia || merged.metasEconomia.length === 0) && Array.isArray(parsed.metasEconomia) && parsed.metasEconomia.length > 0) {
-          merged.metasEconomia = parsed.metasEconomia;
-        }
-      } catch (e) {
-        console.warn("Could not check local storage key", key, e);
-      }
-    }
-
-    return { mergedState: merged, recoveredCount };
-  }, []);
-
-  const normalizeAppState = useCallback((raw: AppState): AppState => {
-    let parsedState = { ...raw };
-    if (!parsedState.rendaMensal) parsedState.rendaMensal = INITIAL_STATE.rendaMensal;
-    if (!parsedState.mesAtual) parsedState.mesAtual = INITIAL_STATE.mesAtual;
-
-    const currentMonth = new Date().toISOString().substring(0, 7);
-
-    // Ensure tetos contains Uber
-    if (!parsedState.tetos || parsedState.tetos.length === 0) {
-      parsedState.tetos = INITIAL_STATE.tetos;
-    } else {
-      if (!parsedState.tetos.some(t => t.categoria.toLowerCase() === 'uber')) {
-        parsedState.tetos.push({ id: 't4', categoria: 'Uber', limite: 300 });
-      }
-    }
-
-    // Ensure any past Uber expenses are tagged under Uber category
-    if (parsedState.gastos) {
-      parsedState.gastos = parsedState.gastos.map(g => {
-        if ((g.categoria === 'Transporte' || g.categoria === 'Outros') && g.descricao.toLowerCase().includes('uber')) {
-          return { ...g, categoria: 'Uber' };
-        }
-        return g;
-      });
-    } else {
-      parsedState.gastos = [];
-    }
-
-    // Ensure metasEconomia is present
-    if (!parsedState.metasEconomia || parsedState.metasEconomia.length === 0) {
-      const baseMeta = (parsedState as any).metaPoupanca || 500;
-      parsedState.metasEconomia = [
-        { id: 'm1', titulo: 'Poupança Mensal', valorAlvo: baseMeta, valorAtual: Math.round(baseMeta * 0.7) },
-        { id: 'm2', titulo: 'Reserva de Emergência', valorAlvo: 300, valorAtual: 150 },
-      ];
-    }
-
-    // Ensure itensSaldo is present
-    if (parsedState.itensSaldo === undefined) {
-      parsedState.itensSaldo = [
-        { id: 'sal-1', descricao: 'Salário Mensal', valor: parsedState.saldoConta || parsedState.rendaMensal || 7914.00, origem: 'Salário' }
-      ];
-    }
-
-    // Ensure categorias has default and custom categories merged
-    const loadedCats = parsedState.categorias || [];
-    const usedCats = [
-      ...(parsedState.gastos || []).map(g => g.categoria),
-      ...(parsedState.tetos || []).map(t => t.categoria)
-    ];
-    const allUniqueCats = Array.from(new Set([...DEFAULT_CATEGORIES, ...loadedCats, ...usedCats])).filter(Boolean);
-    parsedState.categorias = allUniqueCats;
-    
-    const advanceInstallments = (contas: Conta[]) => {
-      return contas.map(c => {
-        if (c.grupo === 'Parcelamentos') {
-          const match = c.nome.match(/(\d+)\/(\d+)/);
-          if (match) {
-            let current = parseInt(match[1], 10);
-            let total = parseInt(match[2], 10);
-            if (current < total) {
-              return { ...c, nome: c.nome.replace(`${match[1]}/${match[2]}`, `${current + 1}/${total}`) };
-            }
-          }
-          
-          const matchDe = c.nome.match(/(\d+)\s+de\s+(\d+)/);
-          if (matchDe) {
-            let current = parseInt(matchDe[1], 10);
-            let total = parseInt(matchDe[2], 10);
-            if (current < total) {
-              return { ...c, nome: c.nome.replace(`${matchDe[1]} de ${matchDe[2]}`, `${current + 1} de ${total}`) };
-            }
-          }
-        }
-        return c;
-      });
-    };
-
-    if (parsedState.contas && parsedState.contas.length > 0) {
-      parsedState.contas = parsedState.contas.map(c => {
-        let defaultFp: FormaPagamento = c.grupo === 'Parcelamentos' ? 'credito' : 'debito';
-        const nl = c.nome.toLowerCase();
-        if (nl.includes('boleto') || nl.includes('neoenergia') || nl.includes('das') || nl.includes('receita') || nl.includes('aluguel') || nl.includes('iptu')) {
-          defaultFp = 'boleto';
-        } else if (nl.includes('google') || nl.includes('apple') || nl.includes('hbo') || nl.includes('ifood') || nl.includes('netflix') || nl.includes('spotify') || nl.includes('globoplay')) {
-          defaultFp = 'credito';
-        }
-        return {
-          ...c,
-          categoria: c.categoria || getCategoryFromName(c.nome, allUniqueCats) || 'Outros',
-          formaPagamento: c.formaPagamento || defaultFp
-        };
-      });
-    } else {
-      parsedState.contas = INITIAL_STATE.contas;
-    }
-
-    if (parsedState.mesAtual !== currentMonth) {
-      parsedState = {
-        ...parsedState,
-        mesAtual: currentMonth,
-        saldoConta: (parsedState.saldoConta || 0) + (parsedState.rendaMensal || 0),
-        contas: advanceInstallments(parsedState.contas)
-      };
-    }
-
-    return parsedState;
-  }, [getCategoryFromName]);
-
-  const saveToFirebase = useCallback(async (stateToSave: AppState) => {
-    try {
-      isSavingRef.current = true;
-      setSyncStatus('saving');
-      const cleanData = JSON.parse(JSON.stringify(stateToSave));
-      const cleanJson = JSON.stringify(cleanData);
-      lastSavedJsonRef.current = cleanJson;
-      localStorage.setItem('qpg_simple_state_v5', cleanJson);
-      await setDoc(doc(db, 'finances', 'bruno'), cleanData);
-      setSyncStatus('synced');
-    } catch (err) {
-      console.error("Failed to save to firebase", err);
-      setSyncStatus('offline');
-    } finally {
-      isSavingRef.current = false;
-    }
-  }, []);
-
-  // Load state on mount and subscribe to real-time updates from Firebase
+  // Single subscription to Firebase Firestore on mount
   useEffect(() => {
     const docRef = doc(db, 'finances', 'bruno');
-    let isInitial = true;
 
     const unsubscribe = onSnapshot(docRef, async (docSnap) => {
       try {
-        let baseState = INITIAL_STATE;
+        // Skip echo updates initiated by our own pending local writes
+        if (docSnap.metadata.hasPendingWrites) {
+          return;
+        }
+
         if (docSnap.exists()) {
-          baseState = docSnap.data() as AppState;
-        }
+          const remoteData = docSnap.data() as AppState;
+          const { mergedState, recoveredCount } = mergeLocalFallback(remoteData);
+          const normalized = normalizeAppState(mergedState);
+          const jsonStr = JSON.stringify(normalized);
 
-        // Merge any local-only data stored in browser
-        const { mergedState, recoveredCount } = mergeLocalFallback(baseState);
-        const normalized = normalizeAppState(mergedState);
-        const normalizedJson = JSON.stringify(normalized);
+          if (jsonStr !== lastRemoteJsonRef.current) {
+            lastRemoteJsonRef.current = jsonStr;
+            setState(normalized);
+            localStorage.setItem('qpg_simple_state_v5', jsonStr);
+          }
 
-        // If local device had items missing in the cloud, upload merged state immediately!
-        if (recoveredCount > 0) {
-          setRecoveryNotice(`${recoveredCount} lançamento(s) recuperados do seu aparelho e sincronizados!`);
-          await saveToFirebase(normalized);
-        }
-
-        // Only update React state if data changed
-        if (isInitial || normalizedJson !== lastSavedJsonRef.current) {
-          lastSavedJsonRef.current = normalizedJson;
+          if (recoveredCount > 0) {
+            setRecoveryNotice(`${recoveredCount} lançamento(s) recuperados do seu aparelho e sincronizados!`);
+            const cleanData = JSON.parse(jsonStr);
+            setDoc(docRef, cleanData).catch(err => console.warn("Auto-recovery upload failed", err));
+          }
+        } else {
+          // Document not in Firestore yet, try restoring from local storage
+          const { mergedState, recoveredCount } = mergeLocalFallback(INITIAL_STATE);
+          const normalized = normalizeAppState(mergedState);
+          const jsonStr = JSON.stringify(normalized);
+          lastRemoteJsonRef.current = jsonStr;
           setState(normalized);
-          setSyncStatus('synced');
+          localStorage.setItem('qpg_simple_state_v5', jsonStr);
+
+          if (recoveredCount > 0) {
+            const cleanData = JSON.parse(jsonStr);
+            setDoc(docRef, cleanData).catch(err => console.warn("Initial state upload failed", err));
+          }
         }
+        setSyncStatus('synced');
       } catch (err) {
-        console.error("Failed to load / sync from firebase", err);
+        console.error("Firestore onSnapshot error:", err);
         setSyncStatus('offline');
       } finally {
-        if (isInitial) {
-          isInitial = false;
+        if (isInitialLoadRef.current) {
+          isInitialLoadRef.current = false;
           setIsLoaded(true);
         }
       }
@@ -1389,18 +1459,48 @@ export default function App() {
       setSyncStatus('offline');
     });
 
-    return () => unsubscribe();
-  }, [mergeLocalFallback, normalizeAppState, saveToFirebase]);
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
-  // Save state on change (when modified by the user in this tab)
+  // Debounced auto-save when user edits state locally
   useEffect(() => {
-    if (isLoaded) {
-      const currentJson = JSON.stringify(state);
-      if (currentJson !== lastSavedJsonRef.current && !isSavingRef.current) {
-        saveToFirebase(state);
-      }
+    if (!isLoaded || isInitialLoadRef.current) return;
+
+    const currentJson = JSON.stringify(state);
+    // Instant zero-latency local persistence
+    localStorage.setItem('qpg_simple_state_v5', currentJson);
+
+    // If state is already equal to cloud data, do not send network requests
+    if (currentJson === lastRemoteJsonRef.current) {
+      return;
     }
-  }, [state, isLoaded, saveToFirebase]);
+
+    setSyncStatus('saving');
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const cleanData = JSON.parse(currentJson);
+        await setDoc(doc(db, 'finances', 'bruno'), cleanData);
+        lastRemoteJsonRef.current = currentJson;
+        setSyncStatus('synced');
+      } catch (err) {
+        console.error("Failed to save to firebase", err);
+        setSyncStatus('offline');
+      }
+    }, 600);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [state, isLoaded]);
 
   const handleManualSync = async () => {
     setIsSyncing(true);
@@ -1413,8 +1513,12 @@ export default function App() {
       }
       const { mergedState, recoveredCount } = mergeLocalFallback(base);
       const normalized = normalizeAppState(mergedState);
+      const cleanJson = JSON.stringify(normalized);
+      lastRemoteJsonRef.current = cleanJson;
       setState(normalized);
-      await saveToFirebase(normalized);
+      localStorage.setItem('qpg_simple_state_v5', cleanJson);
+      await setDoc(doc(db, 'finances', 'bruno'), JSON.parse(cleanJson));
+      setSyncStatus('synced');
       if (recoveredCount > 0) {
         setRecoveryNotice(`${recoveredCount} lançamento(s) do seu aparelho foram sincronizados com a nuvem!`);
       } else {
@@ -1976,7 +2080,7 @@ export default function App() {
             }`}
           >
             <Calendar className="w-4 h-4" />
-            <span>Contas do Mês</span>
+            <span>Gastos Fixos</span>
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
               activeTab === 'contas' ? 'bg-white/20 text-white' : 'bg-[#F1F3F4] text-[#5F6368]'
             }`}>
@@ -2762,16 +2866,16 @@ export default function App() {
           </div>
         )}
 
-        {/* ABA: CONTAS DO MÊS */}
+        {/* ABA: GASTOS FIXOS */}
         {activeTab === 'contas' && (
           <div className="animate-in fade-in duration-200">
-        {/* Contas a Pagar (Fixos & Parcelados) */}
+        {/* Gastos Fixos & Parcelamentos */}
         <section className="bg-white rounded-[28px] p-6 shadow-sm border border-[#DADCE0]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div>
               <h2 className="text-lg font-medium flex items-center gap-2 text-[#202124]">
                 <Calendar className="w-5 h-5 text-[#0B57D0]" />
-                Contas do Mês (Fixos & Parcelados)
+                Gastos Fixos (Fixos & Parcelados)
               </h2>
               <p className="text-xs text-[#5F6368] mt-0.5">
                 Total agendado no mês: <strong className="text-[#0B57D0]">{formatBRL(totalContas)}</strong>
@@ -3871,7 +3975,12 @@ export default function App() {
                   </button>
                   <button 
                     type="button"
-                    onClick={() => setNewExpenseType('Parcela')}
+                    onClick={() => {
+                      setNewExpenseType('Parcela');
+                      setNewExpenseForma('credito');
+                      const calc = calculateParcelaFromDate(newExpenseDate, parcelasTotal, state.mesAtual);
+                      setParcelaAtual(calc.parcela);
+                    }}
                     className={`py-3 px-2 rounded-xl border flex flex-col items-center justify-center transition-colors ${newExpenseType === 'Parcela' ? 'border-[#0B57D0] bg-[#E8F0FE] ring-1 ring-[#0B57D0]' : 'border-[#DADCE0] bg-white'}`}
                   >
                     <span className={`font-bold ${newExpenseType === 'Parcela' ? 'text-[#0B57D0]' : 'text-[#041E49]'}`}>Parcela</span>
@@ -3979,115 +4088,216 @@ export default function App() {
               </div>
 
               {/* Seção detalhada para Parcelamentos */}
-              {newExpenseType === 'Parcela' && (
-                <div className="p-4 bg-[#F8F9FA] rounded-2xl border border-[#DADCE0] space-y-4 animate-in fade-in duration-200">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-bold text-[#041E49] uppercase tracking-wider">
-                        Número de Parcelas
-                      </label>
-                      <span className="text-xs font-bold text-[#0B57D0] bg-[#E8F0FE] px-2.5 py-0.5 rounded-full">
-                        {parcelasTotal} parcelas ({parcelasTotal}x)
-                      </span>
+              {newExpenseType === 'Parcela' && (() => {
+                const dateCalcInfo = calculateParcelaFromDate(newExpenseDate, parcelasTotal, state.mesAtual);
+                const currentMonthName = getMonthNamePT(state.mesAtual || new Date().toISOString().substring(0, 7));
+                const purchaseMonthName = getMonthNamePT(newExpenseDate);
+
+                return (
+                  <div className="p-4 bg-[#F8F9FA] rounded-2xl border border-[#DADCE0] space-y-4 animate-in fade-in duration-200">
+                    {/* Campo de Data da Compra com cálculo automático em tempo real */}
+                    <div className="p-3 bg-white rounded-xl border border-[#DADCE0] space-y-1.5 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-[#041E49] uppercase tracking-wider flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-[#0B57D0]" />
+                          Data em que você fez a compra
+                        </label>
+                        <span className="text-[11px] font-semibold text-[#5F6368]">
+                          {dateCalcInfo.diffMeses > 0 
+                            ? `Compra feita há ${dateCalcInfo.diffMeses} ${dateCalcInfo.diffMeses === 1 ? 'mês' : 'meses'}`
+                            : 'Compra feita neste mês'}
+                        </span>
+                      </div>
+                      <input
+                        type="date"
+                        required
+                        value={newExpenseDate}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setNewExpenseDate(val);
+                          const calc = calculateParcelaFromDate(val, parcelasTotal, state.mesAtual);
+                          setParcelaAtual(calc.parcela);
+                        }}
+                        className="w-full border border-[#DADCE0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] bg-white font-medium text-[#202124]"
+                      />
+                      <p className="text-[11px] text-[#5F6368]">
+                        💡 Se comprou há meses atrás, calculamos a parcela deste mês automaticamente!
+                      </p>
                     </div>
 
-                    {/* Botões rápidos de parcelamento */}
-                    <div className="flex flex-wrap gap-1.5 mb-2.5">
-                      {[2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map(num => (
+                    {/* Banner informativo quando a compra é de meses anteriores */}
+                    {dateCalcInfo.isPastPurchase && dateCalcInfo.diffMeses > 0 && (
+                      <div className="p-3 bg-[#E8F0FE] rounded-xl border border-[#D2E3FC] flex items-start gap-2.5 animate-in fade-in duration-200">
+                        <Sparkles className="w-4 h-4 text-[#0B57D0] shrink-0 mt-0.5" />
+                        <div className="text-xs text-[#041E49] leading-relaxed">
+                          <span className="font-bold text-[#0B57D0] block mb-0.5">Cálculo Automático Aplicado:</span>
+                          Como a compra foi feita em <strong>{purchaseMonthName}</strong> (há {dateCalcInfo.diffMeses} {dateCalcInfo.diffMeses === 1 ? 'mês' : 'meses'}), a parcela que entra no mês atual (<strong>{currentMonthName}</strong>) é a <strong>{parcelaAtual}ª de {parcelasTotal}</strong>.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Número Total de Parcelas */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-bold text-[#041E49] uppercase tracking-wider">
+                          Número Total de Parcelas
+                        </label>
+                        <span className="text-xs font-bold text-[#0B57D0] bg-[#E8F0FE] px-2.5 py-0.5 rounded-full">
+                          {parcelasTotal} parcelas ({parcelasTotal}x)
+                        </span>
+                      </div>
+
+                      {/* Botões rápidos de parcelamento */}
+                      <div className="flex flex-wrap gap-1.5 mb-2.5">
+                        {[2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map(num => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => {
+                              setParcelasTotal(num);
+                              if (parcelaAtual > num) setParcelaAtual(num);
+                            }}
+                            className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                              parcelasTotal === num
+                                ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs'
+                                : 'bg-white text-[#202124] border-[#DADCE0] hover:bg-[#E8EAED]'
+                            }`}
+                          >
+                            {num}x
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Input manual de parcelas */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-[#5F6368]">Ou digite o total:</span>
+                        <div className="flex items-center border border-[#DADCE0] bg-white rounded-lg px-2 py-1 w-32 focus-within:border-[#0B57D0]">
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={parcelasTotal}
+                            onChange={e => {
+                              const valNum = Math.max(1, Math.min(99, Number(e.target.value) || 1));
+                              setParcelasTotal(valNum);
+                              if (parcelaAtual > valNum) setParcelaAtual(valNum);
+                            }}
+                            className="w-full text-center font-bold text-sm text-[#041E49] focus:outline-none"
+                          />
+                          <span className="text-xs font-medium text-[#5F6368] ml-1">vezes</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Qual parcela entra neste mês? (Editor Manual da Parcela Atual) */}
+                    <div className="pt-3 border-t border-[#E8EAED] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="block text-xs font-bold text-[#041E49] uppercase tracking-wider">
+                            Parcela a cobrar neste mês ({currentMonthName})
+                          </label>
+                          <span className="text-[11px] text-[#5F6368]">
+                            {parcelaAtual > 1 
+                              ? `Você já pagou ${parcelaAtual - 1} ${parcelaAtual - 1 === 1 ? 'parcela anterior' : 'parcelas anteriores'}`
+                              : 'Começando na 1ª parcela'}
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold text-[#0B57D0] bg-[#E8F0FE] border border-[#D2E3FC] px-2.5 py-1 rounded-full whitespace-nowrap">
+                          {parcelaAtual}ª de {parcelasTotal}
+                        </span>
+                      </div>
+
+                      {/* Stepper + Input */}
+                      <div className="flex items-center gap-2">
                         <button
-                          key={num}
                           type="button"
-                          onClick={() => {
-                            setParcelasTotal(num);
-                            if (parcelaAtual > num) setParcelaAtual(num);
-                          }}
-                          className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all border ${
-                            parcelasTotal === num
-                              ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-xs'
-                              : 'bg-white text-[#202124] border-[#DADCE0] hover:bg-[#E8EAED]'
+                          disabled={parcelaAtual <= 1}
+                          onClick={() => setParcelaAtual(Math.max(1, parcelaAtual - 1))}
+                          className="w-10 h-10 rounded-xl border border-[#DADCE0] bg-white text-[#041E49] font-bold text-lg flex items-center justify-center hover:bg-[#F1F3F4] active:bg-[#E8EAED] disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
+                          title="Diminuir parcela"
+                        >
+                          -
+                        </button>
+
+                        <div className="flex-1 flex items-center justify-center border border-[#DADCE0] bg-white rounded-xl px-3 py-1.5 focus-within:border-[#0B57D0] focus-within:ring-1 focus-within:ring-[#0B57D0]">
+                          <span className="text-xs font-medium text-[#5F6368] mr-2">Parcela</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={parcelasTotal}
+                            value={parcelaAtual}
+                            onChange={e => {
+                              const p = Math.max(1, Math.min(parcelasTotal, Number(e.target.value) || 1));
+                              setParcelaAtual(p);
+                            }}
+                            className="w-16 text-center font-bold text-base text-[#041E49] focus:outline-none"
+                          />
+                          <span className="text-xs font-bold text-[#5F6368] ml-1">de {parcelasTotal}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={parcelaAtual >= parcelasTotal}
+                          onClick={() => setParcelaAtual(Math.min(parcelasTotal, parcelaAtual + 1))}
+                          className="w-10 h-10 rounded-xl border border-[#DADCE0] bg-white text-[#041E49] font-bold text-lg flex items-center justify-center hover:bg-[#F1F3F4] active:bg-[#E8EAED] disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
+                          title="Aumentar parcela"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* Atalhos para escolher a parcela rapidamente */}
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {Array.from({ length: Math.min(parcelasTotal, 12) }, (_, i) => i + 1).map(num => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => setParcelaAtual(num)}
+                            className={`py-1 px-2.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
+                              parcelaAtual === num
+                                ? 'bg-[#0B57D0] text-white border-[#0B57D0] shadow-2xs font-bold'
+                                : 'bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4]'
+                            }`}
+                          >
+                            {num}ª
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Como informar o valor */}
+                    <div className="pt-3 border-t border-[#E8EAED]">
+                      <span className="text-xs font-bold text-[#041E49] block mb-2">Como você vai informar o valor?</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTipoValorParcela('parcela')}
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center text-center transition-colors cursor-pointer ${
+                            tipoValorParcela === 'parcela'
+                              ? 'border-[#0B57D0] bg-[#E8F0FE] text-[#0B57D0] shadow-2xs font-bold'
+                              : 'border-[#DADCE0] bg-white text-[#5F6368] hover:bg-[#F1F3F4]'
                           }`}
                         >
-                          {num}x
+                          <span>Valor de cada parcela</span>
+                          <span className="text-[10px] font-normal opacity-80 mt-0.5">ex: R$ 100/mês</span>
                         </button>
-                      ))}
-                    </div>
-
-                    {/* Input manual de parcelas */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-[#5F6368]">Ou digite o total:</span>
-                      <div className="flex items-center border border-[#DADCE0] bg-white rounded-lg px-2 py-1 w-32 focus-within:border-[#0B57D0]">
-                        <input
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={parcelasTotal}
-                          onChange={e => {
-                            const valNum = Math.max(1, Math.min(99, Number(e.target.value) || 1));
-                            setParcelasTotal(valNum);
-                            if (parcelaAtual > valNum) setParcelaAtual(valNum);
-                          }}
-                          className="w-full text-center font-bold text-sm text-[#041E49] focus:outline-none"
-                        />
-                        <span className="text-xs font-medium text-[#5F6368] ml-1">vezes</span>
+                        <button
+                          type="button"
+                          onClick={() => setTipoValorParcela('total')}
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center text-center transition-colors cursor-pointer ${
+                            tipoValorParcela === 'total'
+                              ? 'border-[#0B57D0] bg-[#E8F0FE] text-[#0B57D0] shadow-2xs font-bold'
+                              : 'border-[#DADCE0] bg-white text-[#5F6368] hover:bg-[#F1F3F4]'
+                          }`}
+                        >
+                          <span>Valor total da compra</span>
+                          <span className="text-[10px] font-normal opacity-80 mt-0.5">dividir automático</span>
+                        </button>
                       </div>
                     </div>
                   </div>
-
-                  {/* Parcela inicial */}
-                  <div className="pt-3 border-t border-[#E8EAED] flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-[#041E49] block">Parcela atual:</span>
-                      <span className="text-[11px] text-[#5F6368]">Começa em 1 para compras novas</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-[#5F6368]">Parcela</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={parcelasTotal}
-                        value={parcelaAtual}
-                        onChange={e => {
-                          const p = Math.max(1, Math.min(parcelasTotal, Number(e.target.value) || 1));
-                          setParcelaAtual(p);
-                        }}
-                        className="w-12 text-center font-bold text-sm bg-white border border-[#DADCE0] rounded-lg px-1.5 py-1 text-[#041E49] focus:outline-none focus:border-[#0B57D0]"
-                      />
-                      <span className="text-xs font-bold text-[#5F6368]">de {parcelasTotal}</span>
-                    </div>
-                  </div>
-
-                  {/* Como informar o valor */}
-                  <div className="pt-3 border-t border-[#E8EAED]">
-                    <span className="text-xs font-bold text-[#041E49] block mb-2">Como você vai informar o valor?</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTipoValorParcela('parcela')}
-                        className={`py-2 px-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center text-center transition-colors ${
-                          tipoValorParcela === 'parcela'
-                            ? 'border-[#0B57D0] bg-[#E8F0FE] text-[#0B57D0] shadow-2xs font-bold'
-                            : 'border-[#DADCE0] bg-white text-[#5F6368] hover:bg-[#F1F3F4]'
-                        }`}
-                      >
-                        <span>Valor de cada parcela</span>
-                        <span className="text-[10px] font-normal opacity-80 mt-0.5">ex: R$ 100/mês</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTipoValorParcela('total')}
-                        className={`py-2 px-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center text-center transition-colors ${
-                          tipoValorParcela === 'total'
-                            ? 'border-[#0B57D0] bg-[#E8F0FE] text-[#0B57D0] shadow-2xs font-bold'
-                            : 'border-[#DADCE0] bg-white text-[#5F6368] hover:bg-[#F1F3F4]'
-                        }`}
-                      >
-                        <span>Valor total da compra</span>
-                        <span className="text-[10px] font-normal opacity-80 mt-0.5">dividir automático</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
               
               <div>
                 <label className="block text-[#041E49] font-bold mb-1.5">
@@ -4141,20 +4351,22 @@ export default function App() {
                 )}
               </div>
               
-              <div>
-                <label className="block text-[#041E49] font-bold mb-1.5">
-                  {newExpenseType === 'Parcela' || newExpenseType === 'Fixo' 
-                    ? 'Data da Compra ou Vencimento da Fatura' 
-                    : 'Qual a Data? (Vencimento ou Compra)'}
-                </label>
-                <input 
-                  type="date" 
-                  required
-                  value={newExpenseDate}
-                  onChange={e => setNewExpenseDate(e.target.value)}
-                  className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white"
-                />
-              </div>
+              {newExpenseType !== 'Parcela' && (
+                <div>
+                  <label className="block text-[#041E49] font-bold mb-1.5">
+                    {newExpenseType === 'Fixo' 
+                      ? 'Data de Vencimento / Pagamento' 
+                      : 'Qual a Data? (Vencimento ou Compra)'}
+                  </label>
+                  <input 
+                    type="date" 
+                    required
+                    value={newExpenseDate}
+                    onChange={e => setNewExpenseDate(e.target.value)}
+                    className="w-full border border-[#DADCE0] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B57D0] focus:ring-1 focus:ring-[#0B57D0] transition-colors bg-white"
+                  />
+                </div>
+              )}
 
               {/* Categorias - exibidas e selecionáveis para TODOS os tipos de gastos (Fixo, Parcela e Variável) */}
               <div>

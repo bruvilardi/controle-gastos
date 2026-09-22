@@ -28,6 +28,7 @@ export interface Conta {
   parcelasTotal?: number;
   valorTotal?: number;
   formaPagamento?: FormaPagamento | string;
+  dataCompra?: string;
 }
 
 export interface Teto {

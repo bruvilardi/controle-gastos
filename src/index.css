@@ -5,9 +5,16 @@
 }
 
 @layer base {
+  html {
+    touch-action: manipulation;
+  }
   body {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+  button, a, input, select, textarea, [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
