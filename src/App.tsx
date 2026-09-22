@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, Banknote, FileText, Zap, PieChart as PieChartIcon, TrendingUp, Coins, Tag, FolderPlus, Settings2, Download, Briefcase, Laptop, ShoppingBag, ChevronDown, ChevronUp, ArrowDownLeft, Receipt, LayoutDashboard, ArrowRight, ArrowUpRight, Users, UserCheck, Clock } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Sparkles, Plus, Wallet, Calendar, PiggyBank, Target, Trash2, CheckCircle2, Pencil, X, CreditCard, Banknote, FileText, Zap, PieChart as PieChartIcon, TrendingUp, Coins, Tag, FolderPlus, Settings2, Download, Briefcase, Laptop, ShoppingBag, ChevronDown, ChevronUp, ArrowDownLeft, Receipt, LayoutDashboard, ArrowRight, ArrowUpRight, Users, UserCheck, Clock, Cloud, RefreshCw, Smartphone } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { AppState, Conta, Gasto, Teto, MetaEconomia, ItemSaldo, FormaPagamento, GastoCompartilhado } from './types';
 import { db } from './lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 export const DEFAULT_CATEGORIES = [
   'Uber',
@@ -1149,154 +1149,285 @@ export default function App() {
   const [authInput, setAuthInput] = useState('');
   const [authError, setAuthError] = useState(false);
 
-  // Load state on mount
-  useEffect(() => {
-    async function loadData() {
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'saving' | 'offline'>('synced');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
+  const lastSavedJsonRef = useRef<string>('');
+  const isSavingRef = useRef<boolean>(false);
+
+  const LOCAL_STORAGE_KEYS = [
+    'qpg_simple_state_v5',
+    'qpg_simple_state_v4',
+    'qpg_simple_state_v3',
+    'qpg_simple_state',
+    'qpg_state'
+  ];
+
+  const mergeLocalFallback = useCallback((base: AppState): { mergedState: AppState; recoveredCount: number } => {
+    let merged = { ...base };
+    let recoveredCount = 0;
+
+    for (const key of LOCAL_STORAGE_KEYS) {
       try {
-        const docRef = doc(db, 'finances', 'bruno');
-        const docSnap = await getDoc(docRef);
-        
-        let parsedState = INITIAL_STATE;
-        if (docSnap.exists()) {
-          parsedState = docSnap.data() as AppState;
-          
-          if (!parsedState.rendaMensal) parsedState.rendaMensal = INITIAL_STATE.rendaMensal;
-          if (!parsedState.mesAtual) parsedState.mesAtual = INITIAL_STATE.mesAtual;
-        } else {
-          // If no data in firebase yet, fallback to localStorage if available
-          const saved = localStorage.getItem('qpg_simple_state_v5');
-          if (saved) {
-            try {
-              parsedState = JSON.parse(saved);
-              if (!parsedState.rendaMensal) parsedState.rendaMensal = INITIAL_STATE.rendaMensal;
-              if (!parsedState.mesAtual) parsedState.mesAtual = INITIAL_STATE.mesAtual;
-            } catch (e) {}
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') continue;
+
+        // Gastos
+        if (Array.isArray(parsed.gastos) && parsed.gastos.length > 0) {
+          const existingIds = new Set((merged.gastos || []).map((g: any) => g.id));
+          const newGastos = parsed.gastos.filter((g: any) => g && g.id && !existingIds.has(g.id));
+          if (newGastos.length > 0) {
+            merged.gastos = [...(merged.gastos || []), ...newGastos];
+            recoveredCount += newGastos.length;
           }
         }
 
-        const currentMonth = new Date().toISOString().substring(0, 7);
-        
-        // Ensure tetos contains Uber
-        if (!parsedState.tetos || parsedState.tetos.length === 0) {
-          parsedState.tetos = INITIAL_STATE.tetos;
-        } else {
-          if (!parsedState.tetos.some(t => t.categoria.toLowerCase() === 'uber')) {
-            parsedState.tetos.push({ id: 't4', categoria: 'Uber', limite: 300 });
+        // Itens de saldo
+        if (Array.isArray(parsed.itensSaldo) && parsed.itensSaldo.length > 0) {
+          const existingSaldoIds = new Set((merged.itensSaldo || []).map((s: any) => s.id));
+          const newSaldo = parsed.itensSaldo.filter((s: any) => s && s.id && !existingSaldoIds.has(s.id));
+          if (newSaldo.length > 0) {
+            merged.itensSaldo = [...(merged.itensSaldo || []), ...newSaldo];
+            recoveredCount += newSaldo.length;
+            if (merged.saldoConta === 0) {
+              merged.saldoConta = merged.itensSaldo.reduce((acc: number, curr: any) => acc + (Number(curr.valor) || 0), 0);
+            }
           }
         }
 
-        // Ensure any past Uber expenses are tagged under Uber category
-        if (parsedState.gastos) {
-          parsedState.gastos = parsedState.gastos.map(g => {
-            if ((g.categoria === 'Transporte' || g.categoria === 'Outros') && g.descricao.toLowerCase().includes('uber')) {
-              return { ...g, categoria: 'Uber' };
-            }
-            return g;
-          });
+        // Contas
+        if ((!merged.contas || merged.contas.length === 0) && Array.isArray(parsed.contas) && parsed.contas.length > 0) {
+          merged.contas = parsed.contas;
+          recoveredCount += parsed.contas.length;
         }
 
-        // Ensure metasEconomia is present
-        if (!parsedState.metasEconomia || parsedState.metasEconomia.length === 0) {
-          const baseMeta = (parsedState as any).metaPoupanca || 500;
-          parsedState.metasEconomia = [
-            { id: 'm1', titulo: 'Poupança Mensal', valorAlvo: baseMeta, valorAtual: Math.round(baseMeta * 0.7) },
-            { id: 'm2', titulo: 'Reserva de Emergência', valorAlvo: 300, valorAtual: 150 },
-          ];
+        // Metas
+        if ((!merged.metasEconomia || merged.metasEconomia.length === 0) && Array.isArray(parsed.metasEconomia) && parsed.metasEconomia.length > 0) {
+          merged.metasEconomia = parsed.metasEconomia;
         }
-
-        // Ensure itensSaldo is present
-        if (parsedState.itensSaldo === undefined) {
-          parsedState.itensSaldo = [
-            { id: 'sal-1', descricao: 'Salário Mensal', valor: parsedState.saldoConta || parsedState.rendaMensal || 7914.00, origem: 'Salário' }
-          ];
-        }
-
-        // Ensure categorias has default and custom categories merged
-        const loadedCats = parsedState.categorias || [];
-        const usedCats = [
-          ...(parsedState.gastos || []).map(g => g.categoria),
-          ...(parsedState.tetos || []).map(t => t.categoria)
-        ];
-        const allUniqueCats = Array.from(new Set([...DEFAULT_CATEGORIES, ...loadedCats, ...usedCats])).filter(Boolean);
-        parsedState.categorias = allUniqueCats;
-        
-        const advanceInstallments = (contas: Conta[]) => {
-          return contas.map(c => {
-            if (c.grupo === 'Parcelamentos') {
-              const match = c.nome.match(/(\d+)\/(\d+)/);
-              if (match) {
-                let current = parseInt(match[1], 10);
-                let total = parseInt(match[2], 10);
-                if (current < total) {
-                  return { ...c, nome: c.nome.replace(`${match[1]}/${match[2]}`, `${current + 1}/${total}`) };
-                }
-              }
-              
-              const matchDe = c.nome.match(/(\d+)\s+de\s+(\d+)/);
-              if (matchDe) {
-                let current = parseInt(matchDe[1], 10);
-                let total = parseInt(matchDe[2], 10);
-                if (current < total) {
-                  return { ...c, nome: c.nome.replace(`${matchDe[1]} de ${matchDe[2]}`, `${current + 1} de ${total}`) };
-                }
-              }
-            }
-            return c;
-          });
-        };
-
-        if (parsedState.contas) {
-          parsedState.contas = parsedState.contas.map(c => {
-            let defaultFp: FormaPagamento = c.grupo === 'Parcelamentos' ? 'credito' : 'debito';
-            const nl = c.nome.toLowerCase();
-            if (nl.includes('boleto') || nl.includes('neoenergia') || nl.includes('das') || nl.includes('receita') || nl.includes('aluguel') || nl.includes('iptu')) {
-              defaultFp = 'boleto';
-            } else if (nl.includes('google') || nl.includes('apple') || nl.includes('hbo') || nl.includes('ifood') || nl.includes('netflix') || nl.includes('spotify') || nl.includes('globoplay')) {
-              defaultFp = 'credito';
-            }
-            return {
-              ...c,
-              categoria: c.categoria || getCategoryFromName(c.nome, allUniqueCats) || 'Outros',
-              formaPagamento: c.formaPagamento || defaultFp
-            };
-          });
-        }
-
-        if (parsedState.mesAtual !== currentMonth) {
-          parsedState = {
-            ...parsedState,
-            mesAtual: currentMonth,
-            saldoConta: parsedState.saldoConta + parsedState.rendaMensal,
-            contas: advanceInstallments(parsedState.contas)
-          };
-        }
-
-        setState(parsedState);
-      } catch (err) {
-        console.error("Failed to load from firebase", err);
-      } finally {
-        setIsLoaded(true);
+      } catch (e) {
+        console.warn("Could not check local storage key", key, e);
       }
     }
-    loadData();
+
+    return { mergedState: merged, recoveredCount };
   }, []);
 
-  // Save state on change
+  const normalizeAppState = useCallback((raw: AppState): AppState => {
+    let parsedState = { ...raw };
+    if (!parsedState.rendaMensal) parsedState.rendaMensal = INITIAL_STATE.rendaMensal;
+    if (!parsedState.mesAtual) parsedState.mesAtual = INITIAL_STATE.mesAtual;
+
+    const currentMonth = new Date().toISOString().substring(0, 7);
+
+    // Ensure tetos contains Uber
+    if (!parsedState.tetos || parsedState.tetos.length === 0) {
+      parsedState.tetos = INITIAL_STATE.tetos;
+    } else {
+      if (!parsedState.tetos.some(t => t.categoria.toLowerCase() === 'uber')) {
+        parsedState.tetos.push({ id: 't4', categoria: 'Uber', limite: 300 });
+      }
+    }
+
+    // Ensure any past Uber expenses are tagged under Uber category
+    if (parsedState.gastos) {
+      parsedState.gastos = parsedState.gastos.map(g => {
+        if ((g.categoria === 'Transporte' || g.categoria === 'Outros') && g.descricao.toLowerCase().includes('uber')) {
+          return { ...g, categoria: 'Uber' };
+        }
+        return g;
+      });
+    } else {
+      parsedState.gastos = [];
+    }
+
+    // Ensure metasEconomia is present
+    if (!parsedState.metasEconomia || parsedState.metasEconomia.length === 0) {
+      const baseMeta = (parsedState as any).metaPoupanca || 500;
+      parsedState.metasEconomia = [
+        { id: 'm1', titulo: 'Poupança Mensal', valorAlvo: baseMeta, valorAtual: Math.round(baseMeta * 0.7) },
+        { id: 'm2', titulo: 'Reserva de Emergência', valorAlvo: 300, valorAtual: 150 },
+      ];
+    }
+
+    // Ensure itensSaldo is present
+    if (parsedState.itensSaldo === undefined) {
+      parsedState.itensSaldo = [
+        { id: 'sal-1', descricao: 'Salário Mensal', valor: parsedState.saldoConta || parsedState.rendaMensal || 7914.00, origem: 'Salário' }
+      ];
+    }
+
+    // Ensure categorias has default and custom categories merged
+    const loadedCats = parsedState.categorias || [];
+    const usedCats = [
+      ...(parsedState.gastos || []).map(g => g.categoria),
+      ...(parsedState.tetos || []).map(t => t.categoria)
+    ];
+    const allUniqueCats = Array.from(new Set([...DEFAULT_CATEGORIES, ...loadedCats, ...usedCats])).filter(Boolean);
+    parsedState.categorias = allUniqueCats;
+    
+    const advanceInstallments = (contas: Conta[]) => {
+      return contas.map(c => {
+        if (c.grupo === 'Parcelamentos') {
+          const match = c.nome.match(/(\d+)\/(\d+)/);
+          if (match) {
+            let current = parseInt(match[1], 10);
+            let total = parseInt(match[2], 10);
+            if (current < total) {
+              return { ...c, nome: c.nome.replace(`${match[1]}/${match[2]}`, `${current + 1}/${total}`) };
+            }
+          }
+          
+          const matchDe = c.nome.match(/(\d+)\s+de\s+(\d+)/);
+          if (matchDe) {
+            let current = parseInt(matchDe[1], 10);
+            let total = parseInt(matchDe[2], 10);
+            if (current < total) {
+              return { ...c, nome: c.nome.replace(`${matchDe[1]} de ${matchDe[2]}`, `${current + 1} de ${total}`) };
+            }
+          }
+        }
+        return c;
+      });
+    };
+
+    if (parsedState.contas && parsedState.contas.length > 0) {
+      parsedState.contas = parsedState.contas.map(c => {
+        let defaultFp: FormaPagamento = c.grupo === 'Parcelamentos' ? 'credito' : 'debito';
+        const nl = c.nome.toLowerCase();
+        if (nl.includes('boleto') || nl.includes('neoenergia') || nl.includes('das') || nl.includes('receita') || nl.includes('aluguel') || nl.includes('iptu')) {
+          defaultFp = 'boleto';
+        } else if (nl.includes('google') || nl.includes('apple') || nl.includes('hbo') || nl.includes('ifood') || nl.includes('netflix') || nl.includes('spotify') || nl.includes('globoplay')) {
+          defaultFp = 'credito';
+        }
+        return {
+          ...c,
+          categoria: c.categoria || getCategoryFromName(c.nome, allUniqueCats) || 'Outros',
+          formaPagamento: c.formaPagamento || defaultFp
+        };
+      });
+    } else {
+      parsedState.contas = INITIAL_STATE.contas;
+    }
+
+    if (parsedState.mesAtual !== currentMonth) {
+      parsedState = {
+        ...parsedState,
+        mesAtual: currentMonth,
+        saldoConta: (parsedState.saldoConta || 0) + (parsedState.rendaMensal || 0),
+        contas: advanceInstallments(parsedState.contas)
+      };
+    }
+
+    return parsedState;
+  }, [getCategoryFromName]);
+
+  const saveToFirebase = useCallback(async (stateToSave: AppState) => {
+    try {
+      isSavingRef.current = true;
+      setSyncStatus('saving');
+      const cleanData = JSON.parse(JSON.stringify(stateToSave));
+      const cleanJson = JSON.stringify(cleanData);
+      lastSavedJsonRef.current = cleanJson;
+      localStorage.setItem('qpg_simple_state_v5', cleanJson);
+      await setDoc(doc(db, 'finances', 'bruno'), cleanData);
+      setSyncStatus('synced');
+    } catch (err) {
+      console.error("Failed to save to firebase", err);
+      setSyncStatus('offline');
+    } finally {
+      isSavingRef.current = false;
+    }
+  }, []);
+
+  // Load state on mount and subscribe to real-time updates from Firebase
+  useEffect(() => {
+    const docRef = doc(db, 'finances', 'bruno');
+    let isInitial = true;
+
+    const unsubscribe = onSnapshot(docRef, async (docSnap) => {
+      try {
+        let baseState = INITIAL_STATE;
+        if (docSnap.exists()) {
+          baseState = docSnap.data() as AppState;
+        }
+
+        // Merge any local-only data stored in browser
+        const { mergedState, recoveredCount } = mergeLocalFallback(baseState);
+        const normalized = normalizeAppState(mergedState);
+        const normalizedJson = JSON.stringify(normalized);
+
+        // If local device had items missing in the cloud, upload merged state immediately!
+        if (recoveredCount > 0) {
+          setRecoveryNotice(`${recoveredCount} lançamento(s) recuperados do seu aparelho e sincronizados!`);
+          await saveToFirebase(normalized);
+        }
+
+        // Only update React state if data changed
+        if (isInitial || normalizedJson !== lastSavedJsonRef.current) {
+          lastSavedJsonRef.current = normalizedJson;
+          setState(normalized);
+          setSyncStatus('synced');
+        }
+      } catch (err) {
+        console.error("Failed to load / sync from firebase", err);
+        setSyncStatus('offline');
+      } finally {
+        if (isInitial) {
+          isInitial = false;
+          setIsLoaded(true);
+        }
+      }
+    }, (err) => {
+      console.error("Firebase onSnapshot error:", err);
+      const { mergedState } = mergeLocalFallback(INITIAL_STATE);
+      const normalized = normalizeAppState(mergedState);
+      setState(normalized);
+      setIsLoaded(true);
+      setSyncStatus('offline');
+    });
+
+    return () => unsubscribe();
+  }, [mergeLocalFallback, normalizeAppState, saveToFirebase]);
+
+  // Save state on change (when modified by the user in this tab)
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('qpg_simple_state_v5', JSON.stringify(state));
-      
-      // Save to Firebase
-      const saveData = async () => {
-        try {
-          await setDoc(doc(db, 'finances', 'bruno'), state);
-        } catch (err) {
-          console.error("Failed to save to firebase", err);
-        }
-      };
-      saveData();
+      const currentJson = JSON.stringify(state);
+      if (currentJson !== lastSavedJsonRef.current && !isSavingRef.current) {
+        saveToFirebase(state);
+      }
     }
-  }, [state, isLoaded]);
+  }, [state, isLoaded, saveToFirebase]);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      const docRef = doc(db, 'finances', 'bruno');
+      const docSnap = await getDoc(docRef);
+      let base = INITIAL_STATE;
+      if (docSnap.exists()) {
+        base = docSnap.data() as AppState;
+      }
+      const { mergedState, recoveredCount } = mergeLocalFallback(base);
+      const normalized = normalizeAppState(mergedState);
+      setState(normalized);
+      await saveToFirebase(normalized);
+      if (recoveredCount > 0) {
+        setRecoveryNotice(`${recoveredCount} lançamento(s) do seu aparelho foram sincronizados com a nuvem!`);
+      } else {
+        setRecoveryNotice('Sincronização com a nuvem atualizada com sucesso!');
+        setTimeout(() => setRecoveryNotice(null), 4000);
+      }
+    } catch (err) {
+      console.error("Manual sync failed", err);
+      setSyncStatus('offline');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const hoje = new Date();
   const diaAtual = hoje.getDate();
@@ -1728,13 +1859,27 @@ export default function App() {
       <header className="bg-[#0B57D0] text-white pt-8 pb-14 px-4 sm:px-8 rounded-b-[36px] shadow-sm">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-xs">
                 {formatDateBR(getTodayLocal())} • Dia {diaAtual}
               </span>
               <span className="text-xs text-white/80">
                 {diasRestantes} dias restantes no mês
               </span>
+              <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 text-white text-xs backdrop-blur-xs">
+                <Cloud className="w-3.5 h-3.5 text-white/90" />
+                <span className="text-[11px] font-medium">
+                  {syncStatus === 'saving' ? 'Salvando...' : syncStatus === 'offline' ? 'Offline' : 'Nuvem Conectada'}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleManualSync}
+                  className="p-0.5 hover:bg-white/20 rounded-full transition-colors cursor-pointer ml-0.5"
+                  title="Sincronizar com nuvem"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-1">Finanças Simples</h1>
             <p className="text-white/80 text-sm">Olá, Bruno! Acompanhe seu saldo livre, fatura e metas sem complicação.</p>
@@ -1772,6 +1917,22 @@ export default function App() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 -mt-7 space-y-6">
+        {recoveryNotice && (
+          <div className="bg-[#E6F4EA] border border-[#CEEAD6] text-[#0F9D58] px-4 py-3 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-medium shadow-sm animate-in fade-in duration-300">
+            <div className="flex items-center gap-2.5">
+              <Smartphone className="w-5 h-5 shrink-0 text-[#0F9D58]" />
+              <span>{recoveryNotice}</span>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setRecoveryNotice(null)} 
+              className="p-1 hover:bg-[#CEEAD6]/50 rounded-full cursor-pointer text-[#0F9D58] transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Barra de Navegação por Abas */}
         <nav className="bg-white rounded-2xl p-1.5 shadow-sm border border-[#DADCE0] flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth">
           <button
@@ -3647,18 +3808,18 @@ export default function App() {
 
       {/* Modal Adicionar Gasto */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-[#041E49] flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md max-h-[92dvh] sm:max-h-[90vh] flex flex-col rounded-t-[32px] sm:rounded-[32px] shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 overflow-hidden">
+            <div className="flex justify-between items-center px-6 py-4 sm:py-5 border-b border-[#F1F3F4] shrink-0 bg-white">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#041E49] flex items-center gap-2">
                 {editingContaId ? (
                   <>
-                    <Pencil className="w-6 h-6 text-[#0B57D0]" />
+                    <Pencil className="w-5 h-5 sm:w-6 sm:h-6 text-[#0B57D0]" />
                     {newExpenseType === 'Parcela' ? 'Editar Gasto Parcelado' : 'Editar Gasto Fixo'}
                   </>
                 ) : editingGastoId ? (
                   <>
-                    <Pencil className="w-6 h-6 text-[#0B57D0]" />
+                    <Pencil className="w-5 h-5 sm:w-6 sm:h-6 text-[#0B57D0]" />
                     Editar Gasto Variável
                   </>
                 ) : (
@@ -3672,13 +3833,13 @@ export default function App() {
                   setEditingGastoId(null);
                   setEditingContaId(null);
                 }} 
-                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors"
+                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <form onSubmit={handleSaveNewExpense} className="space-y-5">
+            <form onSubmit={handleSaveNewExpense} className="overflow-y-auto p-6 space-y-5 flex-1 overscroll-contain">
               <div>
                 <label className="block text-[#041E49] font-bold mb-1.5">O que você comprou ou pagou?</label>
                 <input 
@@ -4274,9 +4435,9 @@ export default function App() {
 
       {/* Modal Gerenciar Categorias & Limites */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
-            <div className="flex justify-between items-center pb-4 border-b border-[#F1F3F4] shrink-0">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg max-h-[92dvh] sm:max-h-[90vh] flex flex-col rounded-t-[32px] sm:rounded-[32px] shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 overflow-hidden">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-[#F1F3F4] shrink-0 bg-white">
               <h2 className="text-xl font-bold text-[#041E49] flex items-center gap-2">
                 <Tag className="w-5 h-5 text-[#0B57D0]" />
                 Categorias & Limites de Gastos
@@ -4287,13 +4448,13 @@ export default function App() {
                   setNewCatName('');
                   setNewCatTeto('');
                 }} 
-                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors"
+                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 py-4 space-y-6 pr-1">
+            <div className="overflow-y-auto flex-1 p-6 space-y-6 overscroll-contain">
               {/* Form Nova Categoria */}
               <div className="p-4 bg-[#F8F9FA] rounded-2xl border border-[#DADCE0]">
                 <h3 className="text-xs font-bold text-[#041E49] uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -4465,22 +4626,22 @@ export default function App() {
 
       {/* Modal Nova / Editar Meta de Economia */}
       {isMetaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
-            <div className="flex justify-between items-center mb-5">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md max-h-[92dvh] sm:max-h-[90vh] flex flex-col rounded-t-[32px] sm:rounded-[32px] shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 overflow-hidden">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-[#F1F3F4] shrink-0 bg-white">
               <h2 className="text-xl font-bold text-[#041E49] flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-[#0B57D0]" />
                 {editingMetaId ? 'Editar Meta de Economia' : 'Nova Meta de Economia'}
               </h2>
               <button 
                 onClick={() => setIsMetaModalOpen(false)} 
-                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors"
+                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveMeta} className="space-y-4">
+            <form onSubmit={handleSaveMeta} className="overflow-y-auto p-6 space-y-4 flex-1 overscroll-contain">
               <div>
                 <label className="block text-xs font-bold text-[#041E49] mb-1.5 uppercase tracking-wide">
                   Título da Meta
@@ -4550,23 +4711,23 @@ export default function App() {
 
       {/* Modal Nova / Editar Entrada de Saldo (Descritivo) */}
       {isItemSaldoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
-            <div className="flex justify-between items-center mb-5">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md max-h-[92dvh] sm:max-h-[90vh] flex flex-col rounded-t-[32px] sm:rounded-[32px] shadow-xl animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 overflow-hidden">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-[#F1F3F4] shrink-0 bg-white">
               <h2 className="text-xl font-bold text-[#041E49] flex items-center gap-2">
                 <Coins className="w-5 h-5 text-[#0F9D58]" />
                 {editingItemSaldoId ? 'Editar Entrada de Saldo' : 'Nova Entrada de Saldo'}
               </h2>
               <button 
                 onClick={() => setIsItemSaldoModalOpen(false)} 
-                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors"
+                className="p-2 bg-[#F1F3F4] rounded-full text-[#5F6368] hover:bg-[#E8EAED] transition-colors cursor-pointer"
                 title="Fechar"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveItemSaldo} className="space-y-4">
+            <form onSubmit={handleSaveItemSaldo} className="overflow-y-auto p-6 space-y-4 flex-1 overscroll-contain">
               <div>
                 <label className="block text-xs font-bold text-[#041E49] mb-1.5 uppercase tracking-wide">
                   Origem do Recebimento
