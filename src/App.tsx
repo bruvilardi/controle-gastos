@@ -266,13 +266,40 @@ export const getCategoryFromName = (name: string, availableCategories?: string[]
   return 'Outros';
 };
 
-const LOCAL_STORAGE_KEYS = [
-  'qpg_simple_state_v5',
+const CURRENT_STORAGE_KEY = 'qpg_simple_state_v5';
+const LEGACY_STORAGE_KEYS = [
   'qpg_simple_state_v4',
   'qpg_simple_state_v3',
   'qpg_simple_state',
   'qpg_state'
 ];
+
+// Clean legacy keys once on client load so obsolete entries don't linger
+if (typeof window !== 'undefined') {
+  for (const key of LEGACY_STORAGE_KEYS) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export const deduplicateGastos = (gastos: Gasto[]): Gasto[] => {
+  const seenId = new Set<string>();
+  const unique: Gasto[] = [];
+
+  for (const g of gastos) {
+    if (!g || !g.descricao) continue;
+    const id = g.id || Math.random().toString(36).substr(2, 9);
+    if (!seenId.has(id)) {
+      seenId.add(id);
+      unique.push({ ...g, id });
+    }
+  }
+
+  return unique;
+};
 
 export const getMonthNamePT = (yearMonthStr: string): string => {
   if (!yearMonthStr) return '';
@@ -361,56 +388,19 @@ const advanceInstallments = (contas: Conta[]): Conta[] => {
   });
 };
 
-const mergeLocalFallback = (base: AppState): { mergedState: AppState; recoveredCount: number } => {
-  let merged = { ...base };
-  let recoveredCount = 0;
-
-  for (const key of LOCAL_STORAGE_KEYS) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
+const getOfflineLocalState = (base: AppState = INITIAL_STATE): AppState => {
+  try {
+    const raw = localStorage.getItem(CURRENT_STORAGE_KEY);
+    if (raw) {
       const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') continue;
-
-      // Gastos
-      if (Array.isArray(parsed.gastos) && parsed.gastos.length > 0) {
-        const existingIds = new Set((merged.gastos || []).map((g: any) => g.id));
-        const newGastos = parsed.gastos.filter((g: any) => g && g.id && !existingIds.has(g.id));
-        if (newGastos.length > 0) {
-          merged.gastos = [...(merged.gastos || []), ...newGastos];
-          recoveredCount += newGastos.length;
-        }
+      if (parsed && typeof parsed === 'object') {
+        return normalizeAppState(parsed);
       }
-
-      // Itens de saldo
-      if (Array.isArray(parsed.itensSaldo) && parsed.itensSaldo.length > 0) {
-        const existingSaldoIds = new Set((merged.itensSaldo || []).map((s: any) => s.id));
-        const newSaldo = parsed.itensSaldo.filter((s: any) => s && s.id && !existingSaldoIds.has(s.id));
-        if (newSaldo.length > 0) {
-          merged.itensSaldo = [...(merged.itensSaldo || []), ...newSaldo];
-          recoveredCount += newSaldo.length;
-          if (merged.saldoConta === 0) {
-            merged.saldoConta = merged.itensSaldo.reduce((acc: number, curr: any) => acc + (Number(curr.valor) || 0), 0);
-          }
-        }
-      }
-
-      // Contas
-      if ((!merged.contas || merged.contas.length === 0) && Array.isArray(parsed.contas) && parsed.contas.length > 0) {
-        merged.contas = parsed.contas;
-        recoveredCount += parsed.contas.length;
-      }
-
-      // Metas
-      if ((!merged.metasEconomia || merged.metasEconomia.length === 0) && Array.isArray(parsed.metasEconomia) && parsed.metasEconomia.length > 0) {
-        merged.metasEconomia = parsed.metasEconomia;
-      }
-    } catch (e) {
-      console.warn("Could not check local storage key", key, e);
     }
+  } catch (e) {
+    console.warn("Could not read local fallback", e);
   }
-
-  return { mergedState: merged, recoveredCount };
+  return normalizeAppState(base);
 };
 
 const normalizeAppState = (raw: AppState): AppState => {
@@ -429,14 +419,15 @@ const normalizeAppState = (raw: AppState): AppState => {
     }
   }
 
-  // Ensure any past Uber expenses are tagged under Uber category
+  // Deduplicate and ensure past Uber expenses are tagged under Uber category
   if (parsedState.gastos) {
-    parsedState.gastos = parsedState.gastos.map(g => {
+    const processedGastos = parsedState.gastos.map(g => {
       if ((g.categoria === 'Transporte' || g.categoria === 'Outros') && g.descricao.toLowerCase().includes('uber')) {
         return { ...g, categoria: 'Uber' };
       }
       return g;
     });
+    parsedState.gastos = deduplicateGastos(processedGastos);
   } else {
     parsedState.gastos = [];
   }
@@ -518,6 +509,7 @@ export default function App() {
   const [newExpenseForma, setNewExpenseForma] = useState<FormaPagamento>('credito');
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
   const [editingContaId, setEditingContaId] = useState<string | null>(null);
+  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [filtroFormaPagamento, setFiltroFormaPagamento] = useState<string>('todos');
   const [filtroContasForma, setFiltroContasForma] = useState<string>('todos');
   const [isFaturaExpanded, setIsFaturaExpanded] = useState(true);
@@ -1100,9 +1092,11 @@ export default function App() {
 
   const handleSaveNewExpense = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingExpense) return;
     if (!newExpenseName || !newExpenseValue) return;
     const val = parseCurrency(newExpenseValue);
     if (isNaN(val) || val <= 0) return;
+    setIsSubmittingExpense(true);
     
     const finalDate = newExpenseDate || getTodayLocal();
     const activeCats = state.categorias || DEFAULT_CATEGORIES;
@@ -1317,7 +1311,7 @@ export default function App() {
 
         return {
           ...prev,
-          gastos: [novoGasto, ...prev.gastos],
+          gastos: deduplicateGastos([novoGasto, ...prev.gastos]),
           itensSaldo: updatedItens,
           saldoConta: newTotalSaldo
         };
@@ -1385,6 +1379,7 @@ export default function App() {
     setSharedCustomValue('');
     setSharedStatus('pendente');
     setSharedAutoCreatePix(true);
+    setIsSubmittingExpense(false);
   };
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('fin_auth') === 'true');
@@ -1411,34 +1406,24 @@ export default function App() {
 
         if (docSnap.exists()) {
           const remoteData = docSnap.data() as AppState;
-          const { mergedState, recoveredCount } = mergeLocalFallback(remoteData);
-          const normalized = normalizeAppState(mergedState);
+          const normalized = normalizeAppState(remoteData);
           const jsonStr = JSON.stringify(normalized);
 
           if (jsonStr !== lastRemoteJsonRef.current) {
             lastRemoteJsonRef.current = jsonStr;
             setState(normalized);
-            localStorage.setItem('qpg_simple_state_v5', jsonStr);
-          }
-
-          if (recoveredCount > 0) {
-            setRecoveryNotice(`${recoveredCount} lançamento(s) recuperados do seu aparelho e sincronizados!`);
-            const cleanData = JSON.parse(jsonStr);
-            setDoc(docRef, cleanData).catch(err => console.warn("Auto-recovery upload failed", err));
+            localStorage.setItem(CURRENT_STORAGE_KEY, jsonStr);
           }
         } else {
           // Document not in Firestore yet, try restoring from local storage
-          const { mergedState, recoveredCount } = mergeLocalFallback(INITIAL_STATE);
-          const normalized = normalizeAppState(mergedState);
-          const jsonStr = JSON.stringify(normalized);
+          const fallback = getOfflineLocalState(INITIAL_STATE);
+          const jsonStr = JSON.stringify(fallback);
           lastRemoteJsonRef.current = jsonStr;
-          setState(normalized);
-          localStorage.setItem('qpg_simple_state_v5', jsonStr);
+          setState(fallback);
+          localStorage.setItem(CURRENT_STORAGE_KEY, jsonStr);
 
-          if (recoveredCount > 0) {
-            const cleanData = JSON.parse(jsonStr);
-            setDoc(docRef, cleanData).catch(err => console.warn("Initial state upload failed", err));
-          }
+          const cleanData = JSON.parse(jsonStr);
+          setDoc(docRef, cleanData).catch(err => console.warn("Initial state upload failed", err));
         }
         setSyncStatus('synced');
       } catch (err) {
@@ -1452,9 +1437,8 @@ export default function App() {
       }
     }, (err) => {
       console.error("Firebase onSnapshot error:", err);
-      const { mergedState } = mergeLocalFallback(INITIAL_STATE);
-      const normalized = normalizeAppState(mergedState);
-      setState(normalized);
+      const fallback = getOfflineLocalState(INITIAL_STATE);
+      setState(fallback);
       setIsLoaded(true);
       setSyncStatus('offline');
     });
@@ -1470,7 +1454,7 @@ export default function App() {
 
     const currentJson = JSON.stringify(state);
     // Instant zero-latency local persistence
-    localStorage.setItem('qpg_simple_state_v5', currentJson);
+    localStorage.setItem(CURRENT_STORAGE_KEY, currentJson);
 
     // If state is already equal to cloud data, do not send network requests
     if (currentJson === lastRemoteJsonRef.current) {
@@ -1507,23 +1491,21 @@ export default function App() {
     try {
       const docRef = doc(db, 'finances', 'bruno');
       const docSnap = await getDoc(docRef);
-      let base = INITIAL_STATE;
       if (docSnap.exists()) {
-        base = docSnap.data() as AppState;
-      }
-      const { mergedState, recoveredCount } = mergeLocalFallback(base);
-      const normalized = normalizeAppState(mergedState);
-      const cleanJson = JSON.stringify(normalized);
-      lastRemoteJsonRef.current = cleanJson;
-      setState(normalized);
-      localStorage.setItem('qpg_simple_state_v5', cleanJson);
-      await setDoc(doc(db, 'finances', 'bruno'), JSON.parse(cleanJson));
-      setSyncStatus('synced');
-      if (recoveredCount > 0) {
-        setRecoveryNotice(`${recoveredCount} lançamento(s) do seu aparelho foram sincronizados com a nuvem!`);
-      } else {
+        const remoteData = docSnap.data() as AppState;
+        const normalized = normalizeAppState(remoteData);
+        const cleanJson = JSON.stringify(normalized);
+        lastRemoteJsonRef.current = cleanJson;
+        setState(normalized);
+        localStorage.setItem(CURRENT_STORAGE_KEY, cleanJson);
+        if (JSON.stringify(remoteData) !== cleanJson) {
+          await setDoc(docRef, JSON.parse(cleanJson));
+        }
+        setSyncStatus('synced');
         setRecoveryNotice('Sincronização com a nuvem atualizada com sucesso!');
-        setTimeout(() => setRecoveryNotice(null), 4000);
+        setTimeout(() => setRecoveryNotice(null), 3000);
+      } else {
+        setSyncStatus('offline');
       }
     } catch (err) {
       console.error("Manual sync failed", err);
@@ -4636,9 +4618,10 @@ export default function App() {
               
               <button 
                 type="submit"
-                className="w-full bg-[#0F9D58] hover:bg-[#0B8043] text-white font-bold py-4 rounded-xl transition-colors mt-2 text-lg shadow-sm cursor-pointer"
+                disabled={isSubmittingExpense}
+                className="w-full bg-[#0F9D58] hover:bg-[#0B8043] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-colors mt-2 text-lg shadow-sm cursor-pointer"
               >
-                {editingContaId || editingGastoId ? 'Salvar Alterações' : 'Salvar Gasto'}
+                {isSubmittingExpense ? 'Salvando...' : (editingContaId || editingGastoId ? 'Salvar Alterações' : 'Salvar Gasto')}
               </button>
             </form>
           </div>

@@ -1,0 +1,1196 @@
+{
+  "mesAtual": "2026-09",
+  "gastos": [
+    {
+      "id": "cfvl259a9",
+      "categoria": "Mercado",
+      "descricao": "Mercado",
+      "data": "2026-09-21",
+      "valor": 51.46,
+      "formaPagamento": "credito"
+    },
+    {
+      "formaPagamento": "credito",
+      "descricao": "Uber",
+      "categoria": "Uber",
+      "data": "2026-09-21",
+      "valor": 23.98,
+      "id": "wdta6b0la"
+    },
+    {
+      "formaPagamento": "credito",
+      "valor": 26.95,
+      "descricao": "Trufas",
+      "id": "e1p15f2w7",
+      "categoria": "Alimentação",
+      "data": "2026-09-21"
+    },
+    {
+      "valor": 109.34,
+      "formaPagamento": "credito",
+      "categoria": "Delivery",
+      "descricao": "Meatz",
+      "data": "2026-09-20",
+      "id": "ceri1kwy3"
+    },
+    {
+      "descricao": "Uber",
+      "categoria": "Uber",
+      "data": "2026-09-20",
+      "id": "9p6f4zlu5",
+      "formaPagamento": "credito",
+      "valor": 6.6
+    },
+    {
+      "data": "2026-09-19",
+      "valor": 9.59,
+      "descricao": "Uber",
+      "id": "139i0wfkg",
+      "categoria": "Uber",
+      "formaPagamento": "credito"
+    },
+    {
+      "categoria": "Delivery",
+      "descricao": "Mc Donalds",
+      "data": "2026-09-19",
+      "id": "lpk2w359w",
+      "valor": 135.23,
+      "formaPagamento": "credito"
+    },
+    {
+      "formaPagamento": "credito",
+      "data": "2026-09-19",
+      "valor": 32,
+      "categoria": "Alimentação",
+      "descricao": "Bavarian Nuts",
+      "id": "9x67zi5bq"
+    },
+    {
+      "formaPagamento": "credito",
+      "data": "2026-09-19",
+      "valor": 43.98,
+      "descricao": "Uber",
+      "id": "o759bbhx2",
+      "categoria": "Uber"
+    },
+    {
+      "valor": 52.68,
+      "id": "uf00zix4m",
+      "formaPagamento": "credito",
+      "descricao": "Uber",
+      "data": "2026-09-19",
+      "categoria": "Uber"
+    },
+    {
+      "formaPagamento": "credito",
+      "id": "a0z856i5t",
+      "data": "2026-09-19",
+      "valor": 16,
+      "descricao": "agua festa",
+      "categoria": "Lazer"
+    },
+    {
+      "descricao": "bebida festa",
+      "data": "2026-09-18",
+      "categoria": "Lazer",
+      "valor": 104,
+      "id": "1nh9s5r6o",
+      "formaPagamento": "credito"
+    },
+    {
+      "valor": 40.97,
+      "formaPagamento": "credito",
+      "id": "w6x1uv6lq",
+      "descricao": "Uber",
+      "data": "2026-09-18",
+      "categoria": "Uber"
+    },
+    {
+      "data": "2026-09-18",
+      "formaPagamento": "credito",
+      "categoria": "Alimentação",
+      "descricao": "Vendinha mae",
+      "valor": 32.79,
+      "id": "p98d99bch"
+    },
+    {
+      "data": "2026-09-18",
+      "formaPagamento": "credito",
+      "categoria": "Cuidados Pessoais",
+      "id": "pen397jxv",
+      "descricao": "Barbeador",
+      "valor": 75.37
+    },
+    {
+      "formaPagamento": "credito",
+      "id": "gbtjskerv",
+      "valor": 18.98,
+      "data": "2026-09-17",
+      "categoria": "Uber",
+      "descricao": "Uber"
+    },
+    {
+      "formaPagamento": "credito",
+      "id": "m2ef5hn6o",
+      "valor": 115.26,
+      "descricao": "Ritz",
+      "data": "2026-09-17",
+      "categoria": "Alimentação"
+    },
+    {
+      "data": "2026-09-17",
+      "descricao": "Uber",
+      "categoria": "Uber",
+      "valor": 30.98,
+      "formaPagamento": "credito",
+      "id": "4klxurtxm"
+    },
+    {
+      "data": "2026-09-16",
+      "descricao": "Vendinha mae 2",
+      "valor": 23.47,
+      "categoria": "Alimentação",
+      "id": "cdg6g867y",
+      "formaPagamento": "credito"
+    },
+    {
+      "descricao": "Macarrao 2",
+      "categoria": "Alimentação",
+      "id": "q5sd4zo28",
+      "data": "2026-09-13",
+      "valor": 35.91,
+      "formaPagamento": "credito"
+    },
+    {
+      "descricao": "Vendinha mae",
+      "categoria": "Alimentação",
+      "valor": 18.36,
+      "formaPagamento": "credito",
+      "id": "27freb7ja",
+      "data": "2026-09-13"
+    },
+    {
+      "formaPagamento": "credito",
+      "data": "2026-09-13",
+      "categoria": "Alimentação",
+      "descricao": "Macarrao",
+      "valor": 71.82,
+      "id": "e6nzeyhos"
+    },
+    {
+      "id": "1owsdtrn0",
+      "categoria": "Uber",
+      "formaPagamento": "credito",
+      "descricao": "Uber",
+      "data": "2026-09-12",
+      "valor": 29.98
+    },
+    {
+      "valor": 59.99,
+      "descricao": "Uber",
+      "id": "9ifb53lti",
+      "categoria": "Uber",
+      "formaPagamento": "credito",
+      "data": "2026-09-12"
+    },
+    {
+      "id": "5towm3p9q",
+      "descricao": "Janta aero",
+      "data": "2026-09-12",
+      "categoria": "Alimentação",
+      "formaPagamento": "credito",
+      "valor": 63
+    },
+    {
+      "categoria": "Lazer",
+      "descricao": "Rebobi",
+      "data": "2026-09-11",
+      "valor": 50.63,
+      "id": "bi30ubpq0",
+      "formaPagamento": "credito"
+    },
+    {
+      "formaPagamento": "credito",
+      "valor": 70.86,
+      "id": "gj9ecno41",
+      "categoria": "Mercado",
+      "data": "2026-09-11",
+      "descricao": "Mercado"
+    },
+    {
+      "data": "2026-09-11",
+      "categoria": "Alimentação",
+      "descricao": "Cafezin",
+      "valor": 30.9,
+      "formaPagamento": "credito",
+      "id": "216zuitu1"
+    },
+    {
+      "descricao": "Corte Cabelo",
+      "formaPagamento": "credito",
+      "valor": 80,
+      "categoria": "Cuidados Pessoais",
+      "id": "623hata62",
+      "data": "2026-09-10"
+    },
+    {
+      "id": "uzlmtwzq4",
+      "valor": 49.89,
+      "descricao": "Almoço",
+      "categoria": "Alimentação",
+      "data": "2026-09-10",
+      "formaPagamento": "credito"
+    },
+    {
+      "descricao": "Pier",
+      "data": "2026-09-09",
+      "categoria": "Outros",
+      "id": "crquu7xic",
+      "formaPagamento": "credito",
+      "valor": 194.22
+    },
+    {
+      "formaPagamento": "credito",
+      "id": "nbffxpjwd",
+      "data": "2026-09-09",
+      "valor": 29.98,
+      "descricao": "Uber",
+      "categoria": "Uber"
+    },
+    {
+      "valor": 17.98,
+      "formaPagamento": "credito",
+      "id": "albc62k4s",
+      "categoria": "Mercado",
+      "data": "2026-09-08",
+      "descricao": "Mercado"
+    },
+    {
+      "categoria": "Assinaturas",
+      "data": "2026-09-08",
+      "descricao": "IOF Claude",
+      "id": "di4u9lu9f",
+      "formaPagamento": "credito",
+      "valor": 4.08
+    },
+    {
+      "valor": 37.9,
+      "data": "2026-09-07",
+      "id": "sd8vw3bh1",
+      "formaPagamento": "credito",
+      "categoria": "Lazer",
+      "descricao": "Pokemon Go"
+    },
+    {
+      "valor": 125.08,
+      "id": "ook1r1h8f",
+      "categoria": "Saúde",
+      "descricao": "Vitamina D",
+      "formaPagamento": "credito",
+      "data": "2026-09-07"
+    },
+    {
+      "valor": 6.8,
+      "descricao": "Distribuidora",
+      "categoria": "Alimentação",
+      "id": "v4p4232ri",
+      "data": "2026-09-06",
+      "formaPagamento": "credito"
+    },
+    {
+      "id": "gw554w66y",
+      "formaPagamento": "credito",
+      "valor": 216.75,
+      "data": "2026-09-06",
+      "categoria": "Compras",
+      "descricao": "Credito Topaz"
+    },
+    {
+      "data": "2026-09-06",
+      "id": "zjt036ra2",
+      "categoria": "Compras",
+      "valor": 7.59,
+      "formaPagamento": "credito",
+      "descricao": "IOF Creditos Topaz"
+    },
+    {
+      "id": "lz3sdkvue",
+      "valor": 136.49,
+      "categoria": "Delivery",
+      "descricao": "American Cookies",
+      "formaPagamento": "credito",
+      "data": "2026-09-06"
+    },
+    {
+      "data": "2026-09-06",
+      "descricao": "Uber",
+      "formaPagamento": "credito",
+      "categoria": "Uber",
+      "id": "bsvvgwkw4",
+      "valor": 19.09
+    },
+    {
+      "valor": 31.59,
+      "formaPagamento": "credito",
+      "data": "2026-09-06",
+      "id": "o3bz0qnz7",
+      "descricao": "Uber",
+      "categoria": "Uber"
+    },
+    {
+      "valor": 57.7,
+      "descricao": "Crystal Armour",
+      "id": "89ufo9n98",
+      "categoria": "Compras",
+      "formaPagamento": "credito",
+      "data": "2026-09-06"
+    },
+    {
+      "valor": 125.7,
+      "id": "1njqadhkm",
+      "descricao": "Mc Donalds",
+      "data": "2026-09-05",
+      "categoria": "Delivery",
+      "formaPagamento": "credito"
+    },
+    {
+      "data": "2026-09-04",
+      "valor": 136.48,
+      "categoria": "Delivery",
+      "id": "bexudhnuj",
+      "formaPagamento": "credito",
+      "descricao": "Castalia Delivery"
+    },
+    {
+      "data": "2026-09-04",
+      "formaPagamento": "credito",
+      "descricao": "Uber",
+      "categoria": "Uber",
+      "id": "4kgmb5auf",
+      "valor": 13.97
+    },
+    {
+      "categoria": "Uber",
+      "valor": 14.99,
+      "descricao": "Uber",
+      "formaPagamento": "credito",
+      "data": "2026-09-04",
+      "id": "1r7dunarw"
+    },
+    {
+      "data": "2026-09-03",
+      "categoria": "Alimentação",
+      "descricao": "Cafe e um Chero",
+      "formaPagamento": "credito",
+      "id": "qa7p5m89h",
+      "valor": 73.15
+    },
+    {
+      "valor": 70.25,
+      "formaPagamento": "credito",
+      "data": "2026-09-03",
+      "id": "q7xrb4n84",
+      "descricao": "La Guapa",
+      "categoria": "Delivery"
+    },
+    {
+      "categoria": "Alimentação",
+      "descricao": "Don Caricas",
+      "formaPagamento": "credito",
+      "data": "2026-09-02",
+      "id": "e53urqxed",
+      "valor": 60
+    },
+    {
+      "descricao": "Uber",
+      "categoria": "Uber",
+      "formaPagamento": "credito",
+      "data": "2026-09-02",
+      "id": "6qt109ay3",
+      "valor": 18.98
+    },
+    {
+      "categoria": "Uber",
+      "descricao": "Uber",
+      "id": "27kcdugzv",
+      "valor": 13.97,
+      "formaPagamento": "credito",
+      "data": "2026-09-02"
+    },
+    {
+      "descricao": "Passagem Rio",
+      "id": "9lokgjuwj",
+      "formaPagamento": "credito",
+      "categoria": "Viagem",
+      "valor": 224.02,
+      "data": "2026-09-01"
+    },
+    {
+      "formaPagamento": "credito",
+      "id": "va9hrlbis",
+      "data": "2026-09-01",
+      "descricao": "Pokemon TCG",
+      "categoria": "Compras",
+      "valor": 178.99
+    },
+    {
+      "formaPagamento": "credito",
+      "categoria": "Alimentação",
+      "descricao": "Mc Donalds",
+      "id": "8fx8jq39k",
+      "data": "2026-09-01",
+      "valor": 82.8
+    },
+    {
+      "formaPagamento": "credito",
+      "id": "br1wreg6l",
+      "valor": 20,
+      "descricao": "Jose Roberto",
+      "categoria": "Outros",
+      "data": "2026-09-01"
+    },
+    {
+      "id": "9dow7gbui",
+      "categoria": "Delivery",
+      "descricao": "Rappi",
+      "data": "2026-09-01",
+      "valor": 24.9,
+      "formaPagamento": "credito"
+    },
+    {
+      "id": "ahbxng0p3",
+      "data": "2026-08-31",
+      "categoria": "Compras",
+      "formaPagamento": "credito",
+      "descricao": "Fanzine Kylie",
+      "valor": 558.08
+    },
+    {
+      "data": "2026-08-31",
+      "formaPagamento": "credito",
+      "id": "8hbc9rn53",
+      "descricao": "IOF Kylie Fanzine",
+      "valor": 19.53,
+      "categoria": "Compras"
+    },
+    {
+      "categoria": "Discos",
+      "data": "2026-08-31",
+      "descricao": "Tapete Disco",
+      "formaPagamento": "credito",
+      "id": "3tdgjg3qb",
+      "valor": 123.88
+    },
+    {
+      "categoria": "Mercado",
+      "id": "caonuvboq",
+      "descricao": "Mercado",
+      "formaPagamento": "credito",
+      "valor": 46.57,
+      "data": "2026-08-31"
+    },
+    {
+      "data": "2026-08-31",
+      "categoria": "Uber",
+      "formaPagamento": "credito",
+      "valor": 15.93,
+      "descricao": "Uber",
+      "id": "p6ixc7q3v"
+    },
+    {
+      "id": "cbfxmzu5k",
+      "data": "2026-08-31",
+      "valor": 17.94,
+      "formaPagamento": "credito",
+      "categoria": "Uber",
+      "descricao": "Uber"
+    },
+    {
+      "data": "2026-08-31",
+      "formaPagamento": "credito",
+      "descricao": "Pokemon Go",
+      "categoria": "Lazer",
+      "id": "vgxq89l0p",
+      "valor": 13.5
+    },
+    {
+      "data": "2026-08-31",
+      "formaPagamento": "credito",
+      "valor": 378.12,
+      "categoria": "Compras",
+      "descricao": "Topaz",
+      "id": "3ojx9r8he"
+    },
+    {
+      "formaPagamento": "credito",
+      "data": "2026-08-31",
+      "descricao": "IOF Topaz",
+      "categoria": "Compras",
+      "id": "e6q7ovwu0",
+      "valor": 13.23
+    },
+    {
+      "id": "v716syrzr",
+      "descricao": "Case",
+      "formaPagamento": "credito",
+      "categoria": "Compras",
+      "valor": 28.88,
+      "data": "2026-08-30"
+    },
+    {
+      "id": "qpl9r8gpz",
+      "formaPagamento": "credito",
+      "valor": 113.47,
+      "data": "2026-08-30",
+      "categoria": "Alimentação",
+      "descricao": "Pizza"
+    },
+    {
+      "data": "2026-08-29",
+      "id": "3nhbpwkl4",
+      "categoria": "Discos",
+      "formaPagamento": "credito",
+      "descricao": "Plastico Vinil",
+      "valor": 24.9
+    },
+    {
+      "formaPagamento": "credito",
+      "id": "eily92lz0",
+      "data": "2026-08-21",
+      "valor": 825.92,
+      "categoria": "Compras",
+      "descricao": "Girls Aloud LP"
+    },
+    {
+      "id": "7wh1zx0lm",
+      "data": "2026-08-21",
+      "descricao": "IOF Girls Aloud",
+      "formaPagamento": "credito",
+      "categoria": "Compras",
+      "valor": 28.91
+    },
+    {
+      "valor": 28.88,
+      "formaPagamento": "credito",
+      "descricao": "Case celular",
+      "categoria": "Compras",
+      "id": "mv7bv46d8",
+      "data": "2026-08-30"
+    },
+    {
+      "data": "2026-09-30",
+      "valor": 113.47,
+      "id": "taqnm8onv",
+      "formaPagamento": "credito",
+      "categoria": "Alimentação",
+      "descricao": "Pizza"
+    },
+    {
+      "descricao": "Plastico disco",
+      "data": "2026-08-29",
+      "categoria": "Discos",
+      "id": "3970niiff",
+      "valor": 24.9,
+      "formaPagamento": "credito"
+    },
+    {
+      "descricao": "IOF Girls Aloud",
+      "data": "2026-08-28",
+      "categoria": "Discos",
+      "valor": 28.91,
+      "id": "cffbkhwdq",
+      "formaPagamento": "credito"
+    },
+    {
+      "descricao": "LP Girls Aloud",
+      "categoria": "Discos",
+      "valor": 825.92,
+      "data": "2026-08-21",
+      "formaPagamento": "credito",
+      "id": "49haanb17"
+    },
+    {
+      "formaPagamento": "pix",
+      "categoria": "Discos",
+      "descricao": "Taxa cds Madonna",
+      "valor": 115.31,
+      "id": "j46rhjfvc",
+      "data": "2026-09-21"
+    },
+    {
+      "formaPagamento": "pix",
+      "categoria": "Alimentação",
+      "descricao": "Pizza dede",
+      "id": "pyfor6p51",
+      "valor": 48.5,
+      "data": "2026-09-20"
+    },
+    {
+      "id": "3cxnji8u9",
+      "formaPagamento": "pix",
+      "valor": 47,
+      "data": "2026-09-19",
+      "categoria": "Mercado",
+      "descricao": "Pix Marcelo compras"
+    },
+    {
+      "categoria": "Alimentação",
+      "valor": 50.85,
+      "id": "49wiokte5",
+      "data": "2026-09-17",
+      "formaPagamento": "pix",
+      "descricao": "Cafe Felipe"
+    },
+    {
+      "id": "bwqx2m1hg",
+      "valor": 726.24,
+      "data": "2026-09-15",
+      "categoria": "Compras",
+      "formaPagamento": "debito",
+      "descricao": "Pokemon ETB"
+    },
+    {
+      "id": "ob15758je",
+      "data": "2026-09-14",
+      "formaPagamento": "debito",
+      "categoria": "Outros",
+      "valor": 99.28,
+      "descricao": "Doacao"
+    },
+    {
+      "id": "d97g8gejz",
+      "formaPagamento": "debito",
+      "data": "2026-09-11",
+      "valor": 99.28,
+      "categoria": "Compras",
+      "descricao": "Camiseta Madonna"
+    },
+    {
+      "valor": 743.11,
+      "descricao": "Pagamento Taxa Disco",
+      "id": "qg0otg916",
+      "categoria": "Discos",
+      "formaPagamento": "debito",
+      "data": "2026-09-08"
+    },
+    {
+      "valor": 550.81,
+      "data": "2026-09-04",
+      "id": "tfezhwowz",
+      "categoria": "Discos",
+      "descricao": "Taxa discos",
+      "formaPagamento": "debito"
+    },
+    {
+      "descricao": "Benet digital",
+      "data": "2026-09-03",
+      "valor": 69,
+      "categoria": "Outros",
+      "id": "fxtws0bof",
+      "formaPagamento": "debito"
+    },
+    {
+      "valor": 75.37,
+      "formaPagamento": "credito",
+      "descricao": "Gilete",
+      "categoria": "Cuidados Pessoais",
+      "id": "gcj3fdr6e",
+      "data": "2026-09-18"
+    },
+    {
+      "data": "2026-09-14",
+      "valor": 23.47,
+      "descricao": "Macarrao",
+      "id": "yvtg1htj9",
+      "formaPagamento": "credito",
+      "categoria": "Alimentação"
+    },
+    {
+      "categoria": "Mercado",
+      "descricao": "Vendinha mae",
+      "id": "5ophonua9",
+      "valor": 18.36,
+      "data": "2026-09-14",
+      "formaPagamento": "credito"
+    },
+    {
+      "id": "kxgz65xyn",
+      "valor": 29.98,
+      "data": "2026-09-13",
+      "categoria": "Uber",
+      "formaPagamento": "credito",
+      "descricao": "Uber"
+    },
+    {
+      "id": "1e8ea2p82",
+      "data": "2026-09-12",
+      "categoria": "Alimentação",
+      "descricao": "Comida aeroporto",
+      "formaPagamento": "credito",
+      "valor": 63
+    },
+    {
+      "id": "zvbv35vtp",
+      "formaPagamento": "credito",
+      "valor": 10,
+      "categoria": "Alimentação",
+      "data": "2026-09-11",
+      "descricao": "Cafezin di Mineiro"
+    },
+    {
+      "categoria": "Alimentação",
+      "descricao": "Cafezin di Mineiro",
+      "data": "2026-09-11",
+      "formaPagamento": "credito",
+      "id": "7roey9d3g",
+      "valor": 20.9
+    },
+    {
+      "id": "7r4x9tlnf",
+      "data": "2026-09-11",
+      "valor": 60.5,
+      "categoria": "Alimentação",
+      "descricao": "Ana Martins",
+      "formaPagamento": "credito"
+    },
+    {
+      "descricao": "Mc Donalds",
+      "formaPagamento": "credito",
+      "categoria": "Delivery",
+      "valor": 49.89,
+      "id": "21z0fk0lm",
+      "data": "2026-09-10"
+    },
+    {
+      "categoria": "Mercado",
+      "descricao": "Mercado",
+      "formaPagamento": "credito",
+      "valor": 17.98,
+      "data": "2026-09-09",
+      "id": "hn7p5iakn"
+    },
+    {
+      "formaPagamento": "credito",
+      "id": "eewgp1o2b",
+      "data": "2026-09-08",
+      "valor": 120.77,
+      "descricao": "Topaz Creditos",
+      "categoria": "Compras"
+    },
+    {
+      "id": "untv1llpn",
+      "valor": 224.34,
+      "formaPagamento": "credito",
+      "descricao": "Topaz creditos",
+      "data": "2026-09-06",
+      "categoria": "Assinaturas"
+    },
+    {
+      "formaPagamento": "credito",
+      "valor": 136.49,
+      "descricao": "American Coolies",
+      "categoria": "Delivery",
+      "data": "2026-09-06",
+      "id": "nfm5epzrw"
+    },
+    {
+      "valor": 57.7,
+      "formaPagamento": "credito",
+      "id": "lxmzj74q7",
+      "data": "2026-09-06",
+      "categoria": "Compras",
+      "descricao": "Cristal Armour"
+    },
+    {
+      "id": "7fkpv0r9j",
+      "data": "2026-09-04",
+      "categoria": "Delivery",
+      "formaPagamento": "credito",
+      "descricao": "Castalia",
+      "valor": 136.48
+    },
+    {
+      "id": "hnhetb724",
+      "valor": 13.97,
+      "categoria": "Uber",
+      "formaPagamento": "credito",
+      "data": "2026-09-02",
+      "descricao": "Iber"
+    },
+    {
+      "formaPagamento": "credito",
+      "data": "2026-09-01",
+      "valor": 20,
+      "categoria": "Compras",
+      "descricao": "Jose Roberto Melo",
+      "id": "g029deh2b"
+    },
+    {
+      "data": "2026-08-31",
+      "formaPagamento": "credito",
+      "categoria": "Compras",
+      "descricao": "Fanzine Kylie",
+      "id": "c3rfqa81b",
+      "valor": 577.61
+    },
+    {
+      "formaPagamento": "credito",
+      "valor": 123.88,
+      "descricao": "Tapete Vinil",
+      "categoria": "Compras",
+      "data": "2026-08-31",
+      "id": "dxac1eqkz"
+    },
+    {
+      "formaPagamento": "credito",
+      "descricao": "Pokémon Go",
+      "id": "2uqhcy4pm",
+      "categoria": "Lazer",
+      "valor": 13.5,
+      "data": "2026-08-31"
+    },
+    {
+      "categoria": "Assinaturas",
+      "descricao": "Topaz",
+      "valor": 391.35,
+      "id": "yuj48eouy",
+      "data": "2026-08-31",
+      "formaPagamento": "credito"
+    },
+    {
+      "descricao": "Chocolate Trufa",
+      "categoria": "Compras",
+      "valor": 26.95,
+      "id": "48o3nyetz",
+      "data": "2026-09-21",
+      "formaPagamento": "credito"
+    },
+    {
+      "data": "2026-09-01",
+      "descricao": "Jose Roberto Mac",
+      "categoria": "Outros",
+      "valor": 20,
+      "formaPagamento": "credito",
+      "id": "x9p9ngy7u"
+    },
+    {
+      "formaPagamento": "credito",
+      "descricao": "Iof Fanzine Kylie",
+      "id": "jvs296doz",
+      "categoria": "Compras",
+      "valor": 19.53,
+      "data": "2026-08-31"
+    }
+  ],
+  "rendaMensal": 7914,
+  "itensSaldo": [
+    {
+      "origem": "Racha / Reembolso",
+      "id": "sal_g4dq0coek",
+      "data": "2026-09-20",
+      "valor": 54.5,
+      "descricao": "Racha / Reembolso marcelo"
+    },
+    {
+      "id": "sal_fni1z4skq",
+      "descricao": "Freela",
+      "valor": 1000,
+      "origem": "Freela",
+      "data": "2026-09-20"
+    },
+    {
+      "origem": "Racha / Reembolso",
+      "id": "sal_e93o5u01d",
+      "descricao": "Racha / Reembolso pix marcelo",
+      "data": "2026-09-19",
+      "valor": 65
+    },
+    {
+      "origem": "Vendas",
+      "valor": 170.21,
+      "descricao": "Vendas",
+      "data": "2026-09-16",
+      "id": "sal_2j3uli6zx"
+    },
+    {
+      "id": "sal_q1ejlgsab",
+      "data": "2026-09-09",
+      "origem": "Outros",
+      "valor": 1000,
+      "descricao": "Outros Pix Tia"
+    },
+    {
+      "descricao": "Racha / Reembolso Pix Marcelo",
+      "data": "2026-09-06",
+      "origem": "Racha / Reembolso",
+      "valor": 70,
+      "id": "sal_2uig8upqn"
+    },
+    {
+      "id": "sal_3pcz9z8e7",
+      "origem": "Racha / Reembolso",
+      "descricao": "Racha / Reembolso Marcelo",
+      "data": "2026-09-05",
+      "valor": 66.5
+    },
+    {
+      "data": "2026-09-04",
+      "descricao": "Racha / Reembolso Castalia Marcelo",
+      "origem": "Racha / Reembolso",
+      "valor": 68,
+      "id": "sal_2mkkp9gci"
+    },
+    {
+      "origem": "Racha / Reembolso",
+      "data": "2026-09-04",
+      "descricao": "Racha / Reembolso Marcelo",
+      "id": "sal_dn54l6gtp",
+      "valor": 276
+    },
+    {
+      "valor": 21.06,
+      "id": "sal_44nl9lnn6",
+      "descricao": "Vendas",
+      "origem": "Vendas",
+      "data": "2026-08-31"
+    },
+    {
+      "data": "2026-09-04",
+      "descricao": "Salário Mensal - valor anterior",
+      "origem": "Salário",
+      "id": "sal_e2gpta59b",
+      "valor": 7551.71
+    }
+  ],
+  "categorias": [
+    "Uber",
+    "Delivery",
+    "Mercado",
+    "Discos",
+    "Alimentação",
+    "Transporte",
+    "Saúde",
+    "Lazer",
+    "Moradia",
+    "Educação",
+    "Vestuário",
+    "Assinaturas",
+    "Cuidados Pessoais",
+    "Pet",
+    "Viagem",
+    "Outros",
+    "Compras"
+  ],
+  "contas": [
+    {
+      "pago": false,
+      "grupo": "Gastos Fixos",
+      "id": "c8",
+      "nome": "iFood Club",
+      "valor": 12.9,
+      "formaPagamento": "credito",
+      "diaVencimento": 7,
+      "categoria": "Assinaturas"
+    },
+    {
+      "valorTotal": 999,
+      "parcelasTotal": 3,
+      "parcelaAtual": 1,
+      "formaPagamento": "credito",
+      "nome": "Ozivy (01/03)",
+      "grupo": "Parcelamentos",
+      "dataCompra": "2026-09-07",
+      "diaVencimento": 7,
+      "id": "fhdqg9a5z",
+      "categoria": "Saúde",
+      "valor": 333
+    },
+    {
+      "formaPagamento": "credito",
+      "id": "c9ue30k7i",
+      "nome": "Icloud+",
+      "diaVencimento": 12,
+      "grupo": "Gastos Fixos",
+      "categoria": "Assinaturas",
+      "valor": 19.9
+    },
+    {
+      "id": "pr1m7pjqk",
+      "grupo": "Gastos Fixos",
+      "nome": "Apple One",
+      "diaVencimento": 12,
+      "formaPagamento": "credito",
+      "valor": 42.9,
+      "categoria": "Assinaturas"
+    },
+    {
+      "valor": 119.98,
+      "diaVencimento": 18,
+      "id": "9xzqp29qv",
+      "categoria": "Assinaturas",
+      "grupo": "Gastos Fixos",
+      "nome": "Google One",
+      "formaPagamento": "credito"
+    },
+    {
+      "grupo": "Parcelamentos",
+      "dataCompra": "2026-09-20",
+      "parcelasTotal": 6,
+      "id": "tw0ochdsz",
+      "parcelaAtual": 1,
+      "nome": "LP Bionic (01/06)",
+      "categoria": "Discos",
+      "valorTotal": 562.45,
+      "valor": 93.74,
+      "diaVencimento": 20,
+      "formaPagamento": "credito"
+    },
+    {
+      "categoria": "Assinaturas",
+      "formaPagamento": "credito",
+      "parcelaAtual": 8,
+      "diaVencimento": 11,
+      "valor": 22.9,
+      "nome": "Globoplay (08/12)",
+      "valorTotal": 274.8,
+      "id": "8gd9nsu7b",
+      "dataCompra": "2026-02-11",
+      "parcelasTotal": 12,
+      "grupo": "Parcelamentos"
+    },
+    {
+      "formaPagamento": "credito",
+      "nome": "Academia (07/12)",
+      "diaVencimento": 10,
+      "categoria": "Saúde",
+      "valor": 253.49,
+      "dataCompra": "2026-03-10",
+      "parcelaAtual": 7,
+      "parcelasTotal": 12,
+      "id": "qk0nvdzmn",
+      "valorTotal": 3041.88,
+      "grupo": "Parcelamentos"
+    },
+    {
+      "valorTotal": 1298.96,
+      "diaVencimento": 4,
+      "valor": 162.37,
+      "parcelaAtual": 3,
+      "id": "sdb69y322",
+      "formaPagamento": "credito",
+      "nome": "LP Madonna (03/08)",
+      "grupo": "Parcelamentos",
+      "dataCompra": "2026-07-04",
+      "parcelasTotal": 8,
+      "categoria": "Discos"
+    },
+    {
+      "categoria": "Viagem",
+      "parcelaAtual": 2,
+      "formaPagamento": "credito",
+      "nome": "Passagem SP (02/03)",
+      "dataCompra": "2026-08-12",
+      "parcelasTotal": 3,
+      "valor": 327.42,
+      "diaVencimento": 12,
+      "grupo": "Parcelamentos",
+      "id": "29ke7tqo1",
+      "valorTotal": 982.26
+    },
+    {
+      "diaVencimento": 3,
+      "valor": 9.9,
+      "categoria": "Assinaturas",
+      "grupo": "Gastos Fixos",
+      "nome": "Seguro cartao",
+      "id": "volk7ai2z",
+      "formaPagamento": "debito"
+    },
+    {
+      "formaPagamento": "debito",
+      "categoria": "Moradia",
+      "id": "t7xijul5w",
+      "valor": 510.5,
+      "nome": "Condominio",
+      "diaVencimento": 4,
+      "grupo": "Gastos Fixos"
+    },
+    {
+      "diaVencimento": 4,
+      "id": "8m265p4tp",
+      "valor": 307.43,
+      "nome": "Luz",
+      "grupo": "Gastos Fixos",
+      "categoria": "Moradia",
+      "formaPagamento": "debito"
+    },
+    {
+      "categoria": "Moradia",
+      "grupo": "Gastos Fixos",
+      "nome": "Internet",
+      "formaPagamento": "debito",
+      "valor": 156.6,
+      "diaVencimento": 4,
+      "id": "a4a1tqh42"
+    },
+    {
+      "formaPagamento": "debito",
+      "grupo": "Gastos Fixos",
+      "id": "l9cbxtb28",
+      "nome": "MEI",
+      "categoria": "Outros",
+      "valor": 86.05,
+      "diaVencimento": 4
+    },
+    {
+      "diaVencimento": 8,
+      "valor": 49.83,
+      "categoria": "Outros",
+      "grupo": "Gastos Fixos",
+      "formaPagamento": "credito",
+      "nome": "Claro",
+      "id": "f678ng4nc"
+    },
+    {
+      "categoria": "Assinaturas",
+      "nome": "Claude",
+      "id": "inyktyu01",
+      "diaVencimento": 8,
+      "formaPagamento": "credito",
+      "grupo": "Gastos Fixos",
+      "valor": 116.69
+    }
+  ],
+  "saldoConta": 10342.98,
+  "metasEconomia": [
+    {
+      "titulo": "Reserva de Emergência",
+      "valorAlvo": 500,
+      "valorAtual": 0,
+      "id": "m2"
+    }
+  ],
+  "tetos": [
+    {
+      "id": "t1",
+      "categoria": "Discos",
+      "limite": 800
+    },
+    {
+      "id": "t2",
+      "categoria": "Delivery",
+      "limite": 400
+    },
+    {
+      "limite": 1200,
+      "id": "t3",
+      "categoria": "Mercado"
+    },
+    {
+      "categoria": "Uber",
+      "limite": 300,
+      "id": "t4"
+    }
+  ],
+  "metaPoupanca": 500
+}
